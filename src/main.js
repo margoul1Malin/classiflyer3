@@ -103,6 +103,23 @@ function registerIpcHandlers() {
     return result.filePaths[0];
   });
 
+  ipcMain.handle('dialog:chooseFiles', async () => {
+    const result = await dialog.showOpenDialog({ 
+      properties: ['openFile', 'multiSelections', 'showHiddenFiles'],
+      filters: [
+        { name: 'Tous les fichiers', extensions: ['*'] },
+        { name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp', 'svg'] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'Excel', extensions: ['xlsx', 'xls'] },
+        { name: 'Documents', extensions: ['doc', 'docx', 'txt', 'rtf'] }
+      ]
+    });
+    if (result.canceled || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths.map(path => ({ path }));
+  });
+
   // DB helpers
   const getDbPath = async () => {
     const cfg = await readAppConfig();
@@ -131,6 +148,95 @@ function registerIpcHandlers() {
     const db = await readDb();
     const entries = Object.entries(db.mes_classeurs || {});
     return entries.map(([key, value]) => ({ id: key, ...value }));
+  });
+
+  // Classeur helpers
+  ipcMain.handle('classeur:get', async (_e, idKey) => {
+    const db = await readDb();
+    const item = db.mes_classeurs?.[idKey];
+    if (!item) throw new Error('Classeur introuvable');
+    return { id: idKey, ...item };
+  });
+
+  ipcMain.handle('classeur:createFolder', async (_e, idKey, folderName) => {
+    if (!folderName || !idKey) throw new Error('Paramètres manquants');
+    const db = await readDb();
+    const cls = db.mes_classeurs?.[idKey];
+    if (!cls) throw new Error('Classeur introuvable');
+    const folderId = `dossier_${(db.nextId.dossiers = (db.nextId.dossiers || 1) + 1)}`;
+    const folderPath = path.join(cls.sys_path, folderName);
+    await fsp.mkdir(folderPath, { recursive: true });
+    cls.folders = cls.folders || {};
+    cls.folders[folderId] = { name: folderName, sys_path: folderPath, files: {}, folders: {} };
+    cls.updatedAt = Date.now();
+    await writeDb(db);
+    return { id: folderId, ...cls.folders[folderId] };
+  });
+
+  ipcMain.handle('classeur:uploadFiles', async (_e, idKey, targetFolderId, files) => {
+    const db = await readDb();
+    const cls = db.mes_classeurs?.[idKey];
+    if (!cls) throw new Error('Classeur introuvable');
+    const targetFolder = targetFolderId ? (cls.folders?.[targetFolderId]) : null;
+    const destDir = targetFolder ? targetFolder.sys_path : cls.sys_path;
+    await fsp.mkdir(destDir, { recursive: true });
+    cls.files = cls.files || [];
+    const saved = [];
+    for (const f of files || []) {
+      const base = path.basename(f.path || f);
+      const dest = path.join(destDir, base);
+      await fsp.copyFile(f.path || f, dest);
+      const fileRec = { name: base, sys_path: dest, mime: f.mime || null, createdAt: Date.now() };
+      if (targetFolder) {
+        targetFolder.files = targetFolder.files || {};
+        const fid = `file_${(db.nextId.fichiers = (db.nextId.fichiers || 1) + 1)}`;
+        targetFolder.files[fid] = fileRec;
+        saved.push({ id: fid, ...fileRec });
+      } else {
+        const fid = `file_${(db.nextId.fichiers = (db.nextId.fichiers || 1) + 1)}`;
+        cls.files.push({ id: fid, ...fileRec });
+        saved.push({ id: fid, ...fileRec });
+      }
+    }
+    cls.updatedAt = Date.now();
+    await writeDb(db);
+    return saved;
+  });
+
+  ipcMain.handle('classeur:updateFolder', async (_e, idKey, folderId, updates) => {
+    const db = await readDb();
+    const cls = db.mes_classeurs?.[idKey];
+    if (!cls) throw new Error('Classeur introuvable');
+    const folder = cls.folders?.[folderId];
+    if (!folder) throw new Error('Dossier introuvable');
+    
+    if (updates.name && updates.name !== folder.name) {
+      const newPath = path.join(path.dirname(folder.sys_path), updates.name);
+      await fsp.rename(folder.sys_path, newPath);
+      folder.name = updates.name;
+      folder.sys_path = newPath;
+    }
+    
+    cls.updatedAt = Date.now();
+    await writeDb(db);
+    return { id: folderId, ...folder };
+  });
+
+  ipcMain.handle('classeur:deleteFolder', async (_e, idKey, folderId) => {
+    const db = await readDb();
+    const cls = db.mes_classeurs?.[idKey];
+    if (!cls) throw new Error('Classeur introuvable');
+    const folder = cls.folders?.[folderId];
+    if (!folder) throw new Error('Dossier introuvable');
+    
+    // Delete folder from filesystem
+    await fsp.rm(folder.sys_path, { recursive: true, force: true });
+    
+    // Remove from DB
+    delete cls.folders[folderId];
+    cls.updatedAt = Date.now();
+    await writeDb(db);
+    return true;
   });
 
   ipcMain.handle('classeurs:create', async (_event, payload) => {
@@ -238,6 +344,10 @@ const createWindow = async () => {
     height: 600,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      webSecurity: false, // Permet l'accès aux fichiers locaux
+      disableWebSecurity: true, // Désactive complètement la sécurité web
+      nodeIntegration: false,
+      contextIsolation: true,
     },
   });
 
@@ -271,6 +381,30 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// Handler pour convertir les fichiers en data URLs
+ipcMain.handle('file:toDataUrl', async (_e, filePath) => {
+  try {
+    const data = await fsp.readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    let mimeType = 'application/octet-stream';
+    
+    if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.svg'].includes(ext)) {
+      if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+      else if (ext === '.png') mimeType = 'image/png';
+      else if (ext === '.gif') mimeType = 'image/gif';
+      else if (ext === '.webp') mimeType = 'image/webp';
+      else if (ext === '.avif') mimeType = 'image/avif';
+      else if (ext === '.bmp') mimeType = 'image/bmp';
+      else if (ext === '.svg') mimeType = 'image/svg+xml';
+    }
+    
+    const base64 = data.toString('base64');
+    return `data:${mimeType};base64,${base64}`;
+  } catch (error) {
+    throw new Error(`Erreur lors de la lecture du fichier: ${error.message}`);
   }
 });
 

@@ -2,6 +2,7 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' data: file: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: file: https: cdnjs.cloudflare.com; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' data: file: https: cdnjs.cloudflare.com; img-src 'self' data: file: https:; connect-src 'self' data: file: https:;" />
     <title>Classiflyer</title>
   </head>
   <body>
@@ -24,7 +25,42 @@
             <button id="btn-create-classeur" class="btn primary">Créer un classeur</button>
           </div>
         </div>
-        <div id="classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 md:gap-6 lg:gap-8 p-4 md:p-6" aria-live="polite"></div>
+        <div id="classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
+      </section>
+      <section id="view-classeur" class="view" role="region" aria-label="Classeur">
+        <div class="classeur-layout">
+          <div class="viewer">
+            <div class="viewer-nav">
+              <button id="viewer-prev" class="btn">← Précédent</button>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <div id="viewer-title" class="viewer-title"></div>
+                <div id="zoom-controls" style="display: none; gap: 4px;">
+                  <button id="zoom-out" class="btn" style="padding: 4px 8px; font-size: 14px;">-</button>
+                  <span id="zoom-level" style="font-size: 12px; min-width: 40px; text-align: center;">100%</span>
+                  <button id="zoom-in" class="btn" style="padding: 4px 8px; font-size: 14px;">+</button>
+                  <button id="zoom-reset" class="btn" style="padding: 4px 8px; font-size: 12px;" title="Ajuster">⌂</button>
+                </div>
+              </div>
+              <button id="viewer-next" class="btn">Suivant →</button>
+            </div>
+            <div id="viewer-pdf-nav" class="viewer-pdf-nav" style="display: none;">
+              <button id="pdf-prev" class="btn">← Page précédente</button>
+              <span id="pdf-page-info">Page 1 / 1</span>
+              <button id="pdf-next" class="btn">Page suivante →</button>
+            </div>
+            <div id="viewer-canvas" class="viewer-canvas"></div>
+          </div>
+          <aside class="classeur-sidebar">
+            <div class="sidebar-header">
+              <input id="classeur-search" type="search" placeholder="Rechercher dans ce classeur…" />
+              <div class="sidebar-actions">
+                <button id="btn-upload-root" class="btn">Uploader fichier</button>
+                <button id="btn-create-folder" class="btn primary">Nouveau dossier</button>
+              </div>
+            </div>
+            <div id="classeur-tree" class="tree"></div>
+          </aside>
+        </div>
       </section>
       <section id="view-archives" class="view" role="region" aria-label="Archives">
         <h1>Archives</h1>
@@ -124,6 +160,46 @@
         <div class="modal-footer">
           <button class="btn" data-modal-close>Annuler</button>
           <button id="confirm-edit-classeur" class="btn primary">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+    <!-- Modal création dossier -->
+    <div id="modal-create-folder" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-dialog" role="document">
+        <div class="modal-header">
+          <h2>Créer un dossier</h2>
+          <button class="btn icon" data-modal-close aria-label="Fermer">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="folder-name">Nom du dossier</label>
+            <input id="folder-name" type="text" placeholder="Ex: Documents 2025" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal-close>Annuler</button>
+          <button id="confirm-create-folder" class="btn primary">Créer</button>
+        </div>
+      </div>
+    </div>
+    <!-- Modal renommage dossier -->
+    <div id="modal-rename-folder" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-dialog" role="document">
+        <div class="modal-header">
+          <h2>Renommer le dossier</h2>
+          <button class="btn icon" data-modal-close aria-label="Fermer">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="rename-folder-name">Nom du dossier</label>
+            <input id="rename-folder-name" type="text" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal-close>Annuler</button>
+          <button id="confirm-rename-folder" class="btn primary">Renommer</button>
         </div>
       </div>
     </div>

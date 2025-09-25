@@ -77,6 +77,43 @@ body {
   display: block;
 }
 
+/* Classeur page */
+.classeur-layout {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  height: calc(100vh - 100px);
+}
+.viewer { background: #ffffff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
+.viewer-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.viewer-pdf-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
+.viewer-title { font-weight: 600; }
+.viewer-canvas { flex: 1; overflow: auto; overflow-y: auto; background: #f1f5f9; border-radius: 8px; display: grid; place-items: center; }
+.viewer-canvas img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.viewer-canvas canvas { max-width: 100%; max-height: 100%; }
+.viewer-canvas table { border-collapse: collapse; width: 100%; }
+.viewer-canvas th, .viewer-canvas td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+.viewer-canvas th { background-color: #f2f2f2; }
+
+.classeur-sidebar { background: #ffffff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
+.sidebar-header { display: grid; gap: 8px; }
+.sidebar-header input[type="search"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
+.sidebar-actions { display: flex; gap: 8px; }
+.tree { margin-top: 8px; overflow: auto; flex: 1; }
+.tree .node { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+.tree .node:hover { background: #f8fafc; }
+.tree .node.is-selected { background: #e2e8f0; }
+
+.folder-container { margin-bottom: 4px; }
+.folder-node { display: flex; align-items: center; justify-content: space-between; }
+.folder-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 120ms ease; }
+.folder-node:hover .folder-actions { opacity: 1; }
+.btn-icon { 
+  background: transparent; border: 0; padding: 4px; cursor: pointer; 
+  border-radius: 4px; font-size: 12px; 
+}
+.btn-icon:hover { background: #f1f5f9; }
+
 h1 {
   font-size: 1.4rem;
   margin: 0 0 12px 0;
@@ -160,6 +197,9 @@ input[type="search"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radi
 .cards-grid {
   height: calc(100vh - 100px);
   overflow: auto;
+  align-content: start; /* évite la répartition verticale qui crée de grands espaces */
+  align-items: start;   /* aligne chaque carte en haut de sa piste */
+  grid-auto-rows: min-content; /* compresse la hauteur implicite des lignes */
 }
 
 .card {

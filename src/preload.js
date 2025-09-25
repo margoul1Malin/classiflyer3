@@ -12,10 +12,29 @@ contextBridge.exposeInMainWorld('classiflyer', {
   chooseDirectory: async () => {
     return await ipcRenderer.invoke('dialog:chooseDirectory');
   },
+  chooseFiles: async () => {
+    return await ipcRenderer.invoke('dialog:chooseFiles');
+  },
   // Classeurs API
   listClasseurs: async () => ipcRenderer.invoke('classeurs:list'),
   createClasseur: async (payload) => ipcRenderer.invoke('classeurs:create', payload),
   updateClasseur: async (id, updates) => ipcRenderer.invoke('classeurs:update', id, updates),
   deleteClasseur: async (id) => ipcRenderer.invoke('classeurs:delete', id),
   archiveClasseur: async (id) => ipcRenderer.invoke('classeurs:archive', id),
+  // Classeur FS ops
+  getClasseur: async (id) => ipcRenderer.invoke('classeur:get', id),
+  createFolder: async (id, name) => ipcRenderer.invoke('classeur:createFolder', id, name),
+  uploadFiles: async (id, folderId, files) => ipcRenderer.invoke('classeur:uploadFiles', id, folderId, files),
+  updateFolder: async (id, folderId, updates) => ipcRenderer.invoke('classeur:updateFolder', id, folderId, updates),
+  deleteFolder: async (id, folderId) => ipcRenderer.invoke('classeur:deleteFolder', id, folderId),
+  // Utilitaires
+  toFileUrl: (absolutePath) => {
+    // Convertir le chemin en URL file:// compatible Windows/Linux
+    const normalizedPath = absolutePath.replace(/\\/g, '/');
+    return 'file://' + (process.platform === 'win32' ? '/' : '') + normalizedPath;
+  },
+  // Convertir fichier en data URL pour éviter les problèmes CSP
+  fileToDataUrl: async (filePath) => {
+    return await ipcRenderer.invoke('file:toDataUrl', filePath);
+  },
 });
