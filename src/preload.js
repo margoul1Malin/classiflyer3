@@ -20,13 +20,23 @@ contextBridge.exposeInMainWorld('classiflyer', {
   createClasseur: async (payload) => ipcRenderer.invoke('classeurs:create', payload),
   updateClasseur: async (id, updates) => ipcRenderer.invoke('classeurs:update', id, updates),
   deleteClasseur: async (id) => ipcRenderer.invoke('classeurs:delete', id),
-  archiveClasseur: async (id) => ipcRenderer.invoke('classeurs:archive', id),
+  archiveClasseur: async (id, archiveFolderId = null) => ipcRenderer.invoke('classeurs:archive', id, archiveFolderId),
   // Classeur FS ops
   getClasseur: async (id) => ipcRenderer.invoke('classeur:get', id),
   createFolder: async (id, name) => ipcRenderer.invoke('classeur:createFolder', id, name),
   uploadFiles: async (id, folderId, files) => ipcRenderer.invoke('classeur:uploadFiles', id, folderId, files),
   updateFolder: async (id, folderId, updates) => ipcRenderer.invoke('classeur:updateFolder', id, folderId, updates),
   deleteFolder: async (id, folderId) => ipcRenderer.invoke('classeur:deleteFolder', id, folderId),
+  // Archives API
+  listArchives: async () => ipcRenderer.invoke('archives:list'),
+  unarchiveClasseur: async (id) => ipcRenderer.invoke('archives:unarchive', id),
+  deleteArchivedClasseur: async (id) => ipcRenderer.invoke('archives:delete', id),
+  createArchiveFolder: async (name, parentId = null) => ipcRenderer.invoke('archives:createFolder', name, parentId),
+  listArchiveFolders: async () => ipcRenderer.invoke('archives:listFolders'),
+  deleteArchiveFolder: async (folderId) => ipcRenderer.invoke('archives:deleteFolder', folderId),
+  renameArchiveFolder: async (folderId, newName) => ipcRenderer.invoke('archives:renameFolder', folderId, newName),
+  moveClasseurToArchiveFolder: async (classeurId, folderId = null) => ipcRenderer.invoke('archives:moveClasseur', classeurId, folderId),
+  updateArchivedClasseur: async (classeurId, updates) => ipcRenderer.invoke('archives:updateClasseur', classeurId, updates),
   // Utilitaires
   toFileUrl: (absolutePath) => {
     // Convertir le chemin en URL file:// compatible Windows/Linux

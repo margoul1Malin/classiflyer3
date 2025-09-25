@@ -63,8 +63,25 @@
         </div>
       </section>
       <section id="view-archives" class="view" role="region" aria-label="Archives">
-        <h1>Archives</h1>
-        <p>Consultez et restaurez des éléments archivés.</p>
+        <div class="toolbar">
+          <h1>Archives</h1>
+          <div class="toolbar-actions">
+            <input id="search-archives" type="search" placeholder="Rechercher dans les archives…" />
+            <button id="btn-create-archive-folder" class="btn primary">Nouveau dossier</button>
+          </div>
+        </div>
+        <div class="archives-layout">
+          <div id="archive-tree" class="archive-tree resizable">
+            <h3>📁 Dossiers d'archives</h3>
+            <div id="archive-tree-content">
+              <!-- Arborescence des dossiers d'archives -->
+            </div>
+            <div class="resize-handle"></div>
+          </div>
+          <div id="archives-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite">
+            <!-- Classeurs archivés -->
+          </div>
+        </div>
       </section>
       <section id="view-corbeille" class="view" role="region" aria-label="Corbeille">
         <h1>Corbeille</h1>
@@ -200,6 +217,69 @@
         <div class="modal-footer">
           <button class="btn" data-modal-close>Annuler</button>
           <button id="confirm-rename-folder" class="btn primary">Renommer</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal pour créer un dossier d'archive -->
+    <div id="modal-create-archive-folder" class="modal" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>Nouveau dossier d'archive</h2>
+          <button id="close-archive-folder-modal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="archive-folder-name">Nom du dossier :</label>
+            <input id="archive-folder-name" type="text" placeholder="Ex: Projets 2025" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-archive-folder" class="btn">Annuler</button>
+          <button id="create-archive-folder" class="btn primary">Créer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal pour renommer un dossier d'archive -->
+    <div id="modal-rename-archive-folder" class="modal" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>Renommer le dossier</h2>
+          <button id="close-rename-archive-folder-modal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="rename-archive-folder-name">Nouveau nom :</label>
+            <input id="rename-archive-folder-name" type="text" placeholder="Nouveau nom du dossier" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-rename-archive-folder" class="btn">Annuler</button>
+          <button id="confirm-rename-archive-folder" class="btn primary">Renommer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal pour choisir la destination d'archivage -->
+    <div id="modal-archive-destination" class="modal" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog" style="width: 500px;">
+        <div class="modal-header">
+          <h2>Archiver le classeur</h2>
+          <button id="close-archive-destination-modal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <p>Choisissez le dossier de destination :</p>
+          <div id="archive-destination-tree" class="destination-tree">
+            <!-- Arborescence des dossiers d'archives -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-archive-destination" class="btn">Annuler</button>
+          <button id="confirm-archive-destination" class="btn primary">Archiver</button>
         </div>
       </div>
     </div>

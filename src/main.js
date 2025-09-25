@@ -58,7 +58,10 @@ async function ensureRootAndDb(rootPath) {
         archiveFolders: 1,
       },
       mes_classeurs: {},
-      archives: {},
+      archives: {
+        folders: {},
+        classeurs: {}
+      },
       corbeille: {},
     };
     await fsp.writeFile(dbPath, JSON.stringify(initialDb, null, 2), 'utf-8');
@@ -127,10 +130,124 @@ function registerIpcHandlers() {
     return path.join(rootPath, 'db.json');
   };
 
+  function migrateDbStructure(db) {
+    // Migration : Convertir archives de [] vers { folders: {}, classeurs: {} }
+    if (Array.isArray(db.archives)) {
+      db.archives = {
+        folders: {},
+        classeurs: {}
+      };
+    }
+    
+    // S'assurer que la structure archives existe
+    if (!db.archives || typeof db.archives !== 'object') {
+      db.archives = { folders: {}, classeurs: {} };
+    }
+    
+    // S'assurer que folders et classeurs existent
+    if (!db.archives.folders) db.archives.folders = {};
+    if (!db.archives.classeurs) db.archives.classeurs = {};
+    
+    // Migration : S'assurer que corbeille existe
+    if (!db.corbeille) {
+      db.corbeille = Array.isArray(db.corbeille) ? [] : {};
+    }
+    
+    return db;
+  }
+
+  async function detectOrphanedArchives(db, rootPath) {
+    try {
+      const archivesDir = path.join(rootPath, 'archives');
+      const archiveFolders = await fsp.readdir(archivesDir, { withFileTypes: true });
+      
+      for (const dirent of archiveFolders) {
+        if (dirent.isDirectory()) {
+          const classeurName = dirent.name;
+          const classeurPath = path.join(archivesDir, classeurName);
+          
+          // Vérifier si ce classeur existe déjà dans les archives
+          const existsInDb = Object.values(db.archives.classeurs || {}).some(
+            c => c.name === classeurName || c.sys_path === classeurPath
+          );
+          
+          if (!existsInDb) {
+            // Chercher si ce classeur a des données existantes dans mes_classeurs (pour récupérer les couleurs)
+            let existingClasseur = null;
+            for (const [key, classeur] of Object.entries(db.mes_classeurs || {})) {
+              if (classeur.name === classeurName) {
+                existingClasseur = { ...classeur };
+                // Supprimer de mes_classeurs car il est en fait archivé
+                delete db.mes_classeurs[key];
+                break;
+              }
+            }
+            
+            const classeurId = existingClasseur ? 
+              Object.keys(db.mes_classeurs || {}).find(k => db.mes_classeurs[k].name === classeurName) || `classeur_${db.nextId?.classeurs || 1}` :
+              `classeur_${db.nextId?.classeurs || 1}`;
+            
+            if (!existingClasseur && db.nextId) {
+              db.nextId.classeurs = (db.nextId.classeurs || 1) + 1;
+            }
+            
+            console.log(`Réintégration du classeur orphelin: ${classeurName}`);
+            
+            const orphanedClasseur = existingClasseur ? {
+              ...existingClasseur,
+              sys_path: classeurPath,
+              app_path: `/archives/${classeurName}`,
+              archived: true,
+              archivedAt: Date.now(),
+              updatedAt: Date.now(),
+              archiveFolderId: null
+            } : {
+              name: classeurName,
+              sys_path: classeurPath,
+              app_path: `/archives/${classeurName}`,
+              primaryColor: '#ffffff',
+              secondaryColor: '#3b82f6',
+              tertiaryColor: '#0b1220',
+              folders: {},
+              files: [],
+              archived: true,
+              archivedAt: Date.now(),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              archiveFolderId: null
+            };
+            
+            db.archives.classeurs[classeurId] = orphanedClasseur;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Pas de dossier archives ou erreur lors de la détection:', error.message);
+    }
+    
+    return db;
+  }
+
   async function readDb() {
     const dbPath = await getDbPath();
     const raw = await fsp.readFile(dbPath, 'utf-8');
-    return JSON.parse(raw);
+    let db = JSON.parse(raw);
+    
+    // Appliquer les migrations et sauvegarder automatiquement
+    const originalDb = JSON.stringify(db);
+    db = migrateDbStructure(db);
+    
+    // Détecter et réintégrer les classeurs orphelins dans les archives
+    const config = await readAppConfig();
+    const rootPath = config.rootPath || getDefaultRootPath();
+    db = await detectOrphanedArchives(db, rootPath);
+    
+    // Si la structure a changé, sauvegarder automatiquement
+    if (JSON.stringify(db) !== originalDb) {
+      await fsp.writeFile(dbPath, JSON.stringify(db, null, 2), 'utf-8');
+    }
+    
+    return db;
   }
 
   async function writeDb(db) {
@@ -153,7 +270,15 @@ function registerIpcHandlers() {
   // Classeur helpers
   ipcMain.handle('classeur:get', async (_e, idKey) => {
     const db = await readDb();
-    const item = db.mes_classeurs?.[idKey];
+    
+    // Chercher d'abord dans mes_classeurs
+    let item = db.mes_classeurs?.[idKey];
+    
+    // Si pas trouvé, chercher dans les archives
+    if (!item) {
+      item = db.archives?.classeurs?.[idKey];
+    }
+    
     if (!item) throw new Error('Classeur introuvable');
     return { id: idKey, ...item };
   });
@@ -325,15 +450,240 @@ function registerIpcHandlers() {
     return true;
   });
 
-  ipcMain.handle('classeurs:archive', async (_event, idKey) => {
+  ipcMain.handle('classeurs:archive', async (_event, idKey, archiveFolderId = null) => {
     if (!idKey) throw new Error('Id manquant');
     const db = await readDb();
     const current = db.mes_classeurs?.[idKey];
     if (!current) throw new Error('Classeur introuvable');
+    
+    // Déplacer le dossier physique vers les archives
+    const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
+    const archivesPath = path.join(rootPath, 'archives');
+    
+    let targetPath;
+    if (archiveFolderId && db.archives.folders && db.archives.folders[archiveFolderId]) {
+      // Déplacer dans un dossier d'archive spécifique
+      targetPath = path.join(db.archives.folders[archiveFolderId].sys_path, current.name);
+    } else {
+      // Déplacer à la racine des archives
+      targetPath = path.join(archivesPath, current.name);
+    }
+    
+    // Déplacer le dossier physique
+    await fsp.mkdir(path.dirname(targetPath), { recursive: true });
+    await fsp.rename(current.sys_path, targetPath);
+    
+    // Mettre à jour les chemins
+    current.sys_path = targetPath;
+    current.app_path = archiveFolderId 
+      ? `/archives/${db.archives.folders[archiveFolderId].name}/${current.name}`
+      : `/archives/${current.name}`;
     current.archived = true;
+    current.archivedAt = Date.now();
     current.updatedAt = Date.now();
+    current.archiveFolderId = archiveFolderId || null;
+    
+    // Déplacer dans la DB : de mes_classeurs vers archives
+    db.archives = db.archives || { folders: {}, classeurs: {} };
+    db.archives.classeurs = db.archives.classeurs || {};
+    db.archives.classeurs[idKey] = current;
+    delete db.mes_classeurs[idKey];
+    
     await writeDb(db);
     return { id: idKey, ...current };
+  });
+
+  // IPC: archives
+  ipcMain.handle('archives:list', async () => {
+    const db = await readDb();
+    const classeurs = Object.entries(db.archives?.classeurs || {});
+    return classeurs.map(([key, value]) => ({ id: key, ...value }));
+  });
+
+  ipcMain.handle('archives:unarchive', async (_event, idKey) => {
+    if (!idKey) throw new Error('Id manquant');
+    const db = await readDb();
+    const current = db.archives?.classeurs?.[idKey];
+    if (!current) throw new Error('Classeur archivé introuvable');
+    
+    // Déplacer le dossier physique vers mes_classeurs
+    const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
+    const classeursPath = path.join(rootPath, 'classeurs');
+    const targetPath = path.join(classeursPath, current.name);
+    
+    // Déplacer le dossier physique
+    await fsp.mkdir(classeursPath, { recursive: true });
+    await fsp.rename(current.sys_path, targetPath);
+    
+    // Mettre à jour les chemins
+    current.sys_path = targetPath;
+    current.app_path = `/mes_classeurs/${current.name}`;
+    current.archived = false;
+    current.archivedAt = null;
+    current.archiveFolderId = null;
+    current.updatedAt = Date.now();
+    
+    // Déplacer dans la DB : de archives vers mes_classeurs
+    db.mes_classeurs = db.mes_classeurs || {};
+    db.mes_classeurs[idKey] = current;
+    delete db.archives.classeurs[idKey];
+    
+    await writeDb(db);
+    return { id: idKey, ...current };
+  });
+
+  ipcMain.handle('archives:createFolder', async (_event, folderName, parentFolderId = null) => {
+    if (!folderName) throw new Error('Nom de dossier manquant');
+    const db = await readDb();
+    const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
+    
+    db.archives = db.archives || { folders: {}, classeurs: {} };
+    db.nextId = db.nextId || { classeurs: 1, dossiers: 1, fichiers: 1, archiveFolders: 1 };
+    
+    const folderId = `archive_folder_${db.nextId.archiveFolders++}`;
+    
+    let folderPath;
+    let parentPath = '';
+    if (parentFolderId && db.archives.folders[parentFolderId]) {
+      folderPath = path.join(db.archives.folders[parentFolderId].sys_path, folderName);
+      parentPath = db.archives.folders[parentFolderId].app_path;
+    } else {
+      folderPath = path.join(rootPath, 'archives', folderName);
+    }
+    
+    // Créer le dossier physique
+    await fsp.mkdir(folderPath, { recursive: true });
+    
+    const newFolder = {
+      id: folderId,
+      name: folderName,
+      sys_path: folderPath,
+      app_path: parentPath ? `${parentPath}/${folderName}` : `/archives/${folderName}`,
+      parentId: parentFolderId || null,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+    
+    db.archives.folders[folderId] = newFolder;
+    await writeDb(db);
+    return newFolder;
+  });
+
+  ipcMain.handle('archives:delete', async (_event, idKey) => {
+    if (!idKey) throw new Error('Id manquant');
+    const db = await readDb();
+    const current = db.archives?.classeurs?.[idKey];
+    if (!current) throw new Error('Classeur archivé introuvable');
+
+    // Supprimer le dossier physique
+    await fsp.rmdir(current.sys_path, { recursive: true });
+
+    // Supprimer de la DB
+    delete db.archives.classeurs[idKey];
+    await writeDb(db);
+    return true;
+  });
+
+  ipcMain.handle('archives:listFolders', async () => {
+    const db = await readDb();
+    const folders = Object.entries(db.archives?.folders || {});
+    return folders.map(([key, value]) => ({ id: key, ...value }));
+  });
+
+  ipcMain.handle('archives:deleteFolder', async (_event, folderId) => {
+    if (!folderId) throw new Error('Id du dossier manquant');
+    const db = await readDb();
+    const folder = db.archives?.folders?.[folderId];
+    if (!folder) throw new Error('Dossier d\'archive introuvable');
+
+    // Supprimer le dossier physique (récursivement)
+    await fsp.rmdir(folder.sys_path, { recursive: true });
+
+    // Supprimer de la DB (et tous les sous-dossiers)
+    delete db.archives.folders[folderId];
+    
+    // Supprimer aussi tous les sous-dossiers qui ont ce dossier comme parent
+    for (const [key, subFolder] of Object.entries(db.archives.folders || {})) {
+      if (subFolder.parentId === folderId) {
+        delete db.archives.folders[key];
+      }
+    }
+
+    await writeDb(db);
+    return true;
+  });
+
+  ipcMain.handle('archives:renameFolder', async (_event, folderId, newName) => {
+    if (!folderId || !newName) throw new Error('Paramètres manquants');
+    const db = await readDb();
+    const folder = db.archives?.folders?.[folderId];
+    if (!folder) throw new Error('Dossier d\'archive introuvable');
+
+    const oldPath = folder.sys_path;
+    const newPath = path.join(path.dirname(oldPath), newName);
+
+    // Renommer le dossier physique
+    await fsp.rename(oldPath, newPath);
+
+    // Mettre à jour la DB
+    folder.name = newName;
+    folder.sys_path = newPath;
+    folder.app_path = folder.parentId 
+      ? `${db.archives.folders[folder.parentId].app_path}/${newName}`
+      : `/archives/${newName}`;
+    folder.updatedAt = Date.now();
+
+    await writeDb(db);
+    return folder;
+  });
+
+  ipcMain.handle('archives:updateClasseur', async (_event, classeurId, updates) => {
+    if (!classeurId) throw new Error('Id du classeur manquant');
+    const db = await readDb();
+    const classeur = db.archives?.classeurs?.[classeurId];
+    if (!classeur) throw new Error('Classeur archivé introuvable');
+
+    // Mettre à jour les propriétés
+    Object.assign(classeur, updates);
+    classeur.updatedAt = Date.now();
+
+    await writeDb(db);
+    return classeur;
+  });
+
+  ipcMain.handle('archives:moveClasseur', async (_event, classeurId, targetFolderId = null) => {
+    if (!classeurId) throw new Error('Id du classeur manquant');
+    const db = await readDb();
+    const classeur = db.archives?.classeurs?.[classeurId];
+    if (!classeur) throw new Error('Classeur archivé introuvable');
+    const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
+    
+    let newPath;
+    let newAppPath;
+    
+    if (targetFolderId && targetFolderId !== 'root' && db.archives.folders[targetFolderId]) {
+      // Déplacer dans un dossier spécifique
+      const targetFolder = db.archives.folders[targetFolderId];
+      newPath = path.join(targetFolder.sys_path, classeur.name);
+      newAppPath = `${targetFolder.app_path}/${classeur.name}`;
+    } else {
+      // Déplacer à la racine des archives
+      newPath = path.join(rootPath, 'archives', classeur.name);
+      newAppPath = `/archives/${classeur.name}`;
+      targetFolderId = null; // Assurer que c'est null pour la racine
+    }
+
+    // Déplacer le dossier physique
+    await fsp.rename(classeur.sys_path, newPath);
+
+    // Mettre à jour la DB
+    classeur.sys_path = newPath;
+    classeur.app_path = newAppPath;
+    classeur.archiveFolderId = targetFolderId;
+    classeur.updatedAt = Date.now();
+
+    await writeDb(db);
+    return classeur;
   });
 }
 
@@ -349,6 +699,18 @@ const createWindow = async () => {
       nodeIntegration: false,
       contextIsolation: true,
     },
+  });
+
+  // Désactiver complètement la CSP pour permettre les CDN externes
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    // Supprimer complètement tous les headers CSP
+    const responseHeaders = { ...details.responseHeaders };
+    delete responseHeaders['content-security-policy'];
+    delete responseHeaders['Content-Security-Policy'];
+    delete responseHeaders['content-security-policy-report-only'];
+    delete responseHeaders['Content-Security-Policy-Report-Only'];
+    
+    callback({ responseHeaders });
   });
 
   // and load the index.html of the app.

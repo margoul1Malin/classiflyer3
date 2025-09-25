@@ -286,3 +286,352 @@ input[type="search"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radi
 
 .preview { margin-top: 12px; display: flex; align-items: center; justify-content: center; }
 .preview-card { width: 150px; height: 250px; border-right-width: 8px; }
+
+/* Archives layout */
+.archives-layout {
+  display: flex;
+  height: calc(100vh - 120px);
+  gap: 16px;
+  padding: 0;
+}
+
+.archive-tree {
+  width: 320px;
+  min-width: 280px;
+  max-width: 600px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin: 16px 0 16px 16px;
+  position: relative;
+}
+
+.archive-tree h3 {
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 8px;
+}
+
+.archive-tree .tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  min-width: 0; /* Permet au flexbox de rétrécir */
+  overflow: hidden; /* Cache le débordement */
+}
+
+.archive-tree .tree-item:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.archive-tree .tree-item.is-selected {
+  background: #3b82f6;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.archive-tree .tree-item .folder-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0; /* Permet la troncature */
+  position: relative;
+}
+
+/* Tooltip pour les noms longs */
+.archive-tree .tree-item .folder-name:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0;
+  animation: tooltipFadeIn 0.2s ease-in-out 0.5s forwards;
+  pointer-events: none;
+}
+
+@keyframes tooltipFadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Icônes fixes */
+.archive-tree .tree-item > span:not(.folder-name):not(.expand-arrow) {
+  flex-shrink: 0; /* Les icônes 📂 ne rétrécissent pas */
+}
+
+.archive-tree .tree-item .folder-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0; /* Empêche les boutons de rétrécir */
+  min-width: 80px; /* Réserve l'espace pour les 3 boutons */
+}
+
+.archive-tree .tree-item:hover .folder-actions {
+  opacity: 1;
+}
+
+.archive-tree .tree-item .folder-actions .btn {
+  padding: 4px 6px;
+  font-size: 12px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.archive-tree .tree-item .folder-actions .btn:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: #cbd5e1;
+  transform: scale(1.05);
+}
+
+.archive-tree .tree-item.is-selected .folder-actions .btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.archive-tree .tree-item.is-selected .folder-actions .btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.archive-tree .tree-children {
+  position: relative;
+}
+
+.archive-tree .tree-children::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #e2e8f0;
+}
+
+.archive-tree .expand-arrow {
+  cursor: pointer;
+  user-select: none;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  margin-right: 4px;
+  flex-shrink: 0; /* Ne rétrécit jamais */
+}
+
+.archive-tree .expand-arrow:hover {
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(1.1);
+}
+
+.archive-tree .tree-item {
+  transition: all 0.2s ease;
+}
+
+.archive-tree .tree-item .add-subfolder {
+  background: #22c55e !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 50% !important;
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-width: 22px !important;
+  flex-shrink: 0 !important;
+}
+
+.archive-tree .tree-item .add-subfolder:hover {
+  background: #16a34a;
+  transform: scale(1.2);
+  box-shadow: 0 2px 4px rgba(34, 197, 94, 0.3);
+}
+
+#archives-grid {
+  flex: 1;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+/* Correction pour les inputs des modales d'archives */
+#modal-rename-archive-folder input,
+#modal-create-archive-folder input {
+  pointer-events: auto !important;
+  user-select: text !important;
+  cursor: text !important;
+  background: white !important;
+  border: 1px solid #d1d5db !important;
+  border-radius: 4px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  outline: none !important;
+}
+
+#modal-rename-archive-folder input:focus,
+#modal-create-archive-folder input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Poignée de redimensionnement */
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: ew-resize;
+  background: transparent;
+  border-right: 2px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.resize-handle:hover {
+  border-right-color: #3b82f6;
+}
+
+.resize-handle.resizing {
+  border-right-color: #1d4ed8;
+  background: rgba(59, 130, 246, 0.1);
+}
+
+/* Style pendant le redimensionnement */
+.archive-tree.resizing {
+  user-select: none;
+  transition: none;
+}
+
+.archive-tree.resizing * {
+  user-select: none;
+  pointer-events: none;
+}
+
+/* Modal de destination d'archivage */
+.destination-tree {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.destination-tree .tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.destination-tree .tree-item:hover {
+  background: #e2e8f0;
+}
+
+.destination-tree .tree-item.selected {
+  background: #3b82f6;
+  color: white;
+  border-color: #2563eb;
+}
+
+.destination-tree .tree-children {
+  margin-left: 20px;
+}
+
+/* Drag & Drop pour classeurs */
+.card.dragging {
+  opacity: 0.8;
+  transform: rotate(3deg) scale(1.05);
+  cursor: grabbing;
+  z-index: 9999;
+  pointer-events: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: none;
+}
+
+.archive-tree .tree-item.drop-target {
+  background: #dbeafe !important;
+  border: 2px dashed #3b82f6 !important;
+  border-radius: 8px !important;
+}
+
+.archive-tree .tree-item.drop-target.drag-over {
+  background: #3b82f6 !important;
+  color: white !important;
+  border-style: solid !important;
+}
+
+/* Améliorer le feedback visuel */
+.card.drag-ready {
+  cursor: grab;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  user-select: none;
+}
+
+.card.drag-ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Prévenir la sélection de texte dans les archives */
+.archives-layout * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Animation pour le drag */
+@keyframes dragPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.card.drag-ready {
+  cursor: grab;
+  transition: transform 0.2s ease;
+}
+
+.card.drag-ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
