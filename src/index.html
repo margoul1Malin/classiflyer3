@@ -1,0 +1,131 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Classiflyer</title>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">Classiflyer</div>
+      <nav class="nav">
+        <button class="nav-item is-active" data-view="view-classeurs">Mes Classeurs</button>
+        <button class="nav-item" data-view="view-archives">Archives</button>
+        <button class="nav-item" data-view="view-corbeille">Corbeille</button>
+        <div class="nav-separator"></div>
+        <button class="nav-item" data-view="view-parametres">Paramètres</button>
+      </nav>
+    </aside>
+    <main class="content">
+      <section id="view-classeurs" class="view is-visible" role="region" aria-label="Mes Classeurs">
+        <div class="toolbar">
+          <h1>Mes Classeurs</h1>
+          <div class="toolbar-actions">
+            <input id="search-classeurs" type="search" placeholder="Rechercher un classeur…" />
+            <button id="btn-create-classeur" class="btn primary">Créer un classeur</button>
+          </div>
+        </div>
+        <div id="classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 md:gap-6 lg:gap-8 p-4 md:p-6" aria-live="polite"></div>
+      </section>
+      <section id="view-archives" class="view" role="region" aria-label="Archives">
+        <h1>Archives</h1>
+        <p>Consultez et restaurez des éléments archivés.</p>
+      </section>
+      <section id="view-corbeille" class="view" role="region" aria-label="Corbeille">
+        <h1>Corbeille</h1>
+        <p>Supprimez définitivement ou restaurez des éléments.</p>
+      </section>
+      <section id="view-parametres" class="view" role="region" aria-label="Paramètres">
+        <h1>Paramètres</h1>
+        <p>Configurez le chemin système du dossier mère et du db.json.</p>
+        <div class="settings-grid">
+          <div class="form-row">
+            <label for="input-root-path">Dossier mère de Classiflyer (rootPath)</label>
+            <input id="input-root-path" type="text" placeholder="Ex: ~/.classiflyer/config ou C:\\Users\\...\\AppData\\Roaming\\Classiflyer\\config" />
+            <button id="btn-browse-root" class="btn">Parcourir…</button>
+          </div>
+          <div class="form-actions">
+            <button id="btn-save-settings" class="btn primary">Enregistrer</button>
+          </div>
+        </div>
+      </section>
+    </main>
+    <!-- Modal création classeur -->
+    <div id="modal-create" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-dialog" role="document">
+        <div class="modal-header">
+          <h2>Créer un classeur</h2>
+          <button class="btn icon" data-modal-close aria-label="Fermer">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="classeur-name">Nom du classeur</label>
+            <input id="classeur-name" type="text" placeholder="Ex: Factures 2025" />
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="classeur-primary">Couleur primaire</label>
+              <input id="classeur-primary" type="color" value="#0ea5e9" />
+            </div>
+            <div class="form-col">
+              <label for="classeur-secondary">Couleur secondaire</label>
+              <input id="classeur-secondary" type="color" value="#38bdf8" />
+            </div>
+            <div class="form-col">
+              <label for="classeur-tertiary">Couleur du texte</label>
+              <input id="classeur-tertiary" type="color" value="#0b1220" />
+            </div>
+          </div>
+          <div class="preview">
+            <div id="preview-classeur" class="card preview-card">
+              <div class="card-title">Aperçu</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal-close>Annuler</button>
+          <button id="confirm-create-classeur" class="btn primary">Créer</button>
+        </div>
+      </div>
+    </div>
+    <!-- Modal édition classeur -->
+    <div id="modal-edit" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+      <div class="modal-backdrop" data-modal-close></div>
+      <div class="modal-dialog" role="document">
+        <div class="modal-header">
+          <h2>Modifier le classeur</h2>
+          <button class="btn icon" data-modal-close aria-label="Fermer">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="edit-name">Nom du classeur</label>
+            <input id="edit-name" type="text" />
+          </div>
+          <div class="form-row">
+            <div class="form-col">
+              <label for="edit-primary">Couleur primaire</label>
+              <input id="edit-primary" type="color" />
+            </div>
+            <div class="form-col">
+              <label for="edit-secondary">Couleur secondaire</label>
+              <input id="edit-secondary" type="color" />
+            </div>
+            <div class="form-col">
+              <label for="edit-tertiary">Couleur du titre</label>
+              <input id="edit-tertiary" type="color" />
+            </div>
+          </div>
+          <div class="preview">
+            <div id="preview-edit" class="card preview-card">
+              <div class="card-title">Aperçu</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" data-modal-close>Annuler</button>
+          <button id="confirm-edit-classeur" class="btn primary">Enregistrer</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

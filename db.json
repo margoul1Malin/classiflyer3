@@ -1,0 +1,465 @@
+{
+  "classeurs": [
+    {
+      "name": "classeur23",
+      "primaryColor": "#ff3300",
+      "secondaryColor": "#1E40AF",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur2",
+      "id": 2,
+      "createdAt": "2025-09-23T16:03:32.266Z",
+      "updatedAt": "2025-09-24T14:29:27.682Z",
+      "isArchived": true,
+      "archiveFolder": "Projets 2K23",
+      "isDeleted": false
+    },
+    {
+      "name": "testarchive",
+      "primaryColor": "#fafafa",
+      "secondaryColor": "#003cff",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/testarchive",
+      "id": 4,
+      "createdAt": "2025-09-23T16:04:25.145Z",
+      "updatedAt": "2025-09-23T16:04:45.441Z",
+      "isArchived": true,
+      "archiveFolder": "Projets 2K24",
+      "isDeleted": false
+    },
+    {
+      "name": "azeaze",
+      "primaryColor": "#000000",
+      "secondaryColor": "#1E40AF",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/azeaze",
+      "id": 10,
+      "createdAt": "2025-09-24T14:10:34.127Z",
+      "updatedAt": "2025-09-24T14:25:46.918Z",
+      "isArchived": true,
+      "isDeleted": false,
+      "archiveFolder": "Projets 2K24"
+    },
+    {
+      "name": "Premier Classeur",
+      "primaryColor": "#3B82F6",
+      "secondaryColor": "#1E40AF",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Premier Classeur",
+      "id": 12,
+      "createdAt": "2025-09-24T20:06:08.777Z",
+      "updatedAt": "2025-09-24T20:06:08.777Z",
+      "isArchived": false,
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:17:30.492Z"
+    },
+    {
+      "name": "Deuxième Classeur Archivé",
+      "primaryColor": "#000000",
+      "secondaryColor": "#ff4000",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Deuxième Classeur Archivé",
+      "id": 13,
+      "createdAt": "2025-09-24T20:06:33.188Z",
+      "updatedAt": "2025-09-24T20:06:33.188Z",
+      "isArchived": false,
+      "isDeleted": false
+    },
+    {
+      "name": "Troisieme Classeur à Jeter LOL",
+      "primaryColor": "#75aaff",
+      "secondaryColor": "#1E40AF",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Troisieme Classeur à Jeter LOL",
+      "id": 14,
+      "createdAt": "2025-09-24T20:06:51.281Z",
+      "updatedAt": "2025-09-24T20:06:51.281Z",
+      "isArchived": false,
+      "isDeleted": false
+    }
+  ],
+  "dossiers": [
+    {
+      "classeurId": 1,
+      "name": "Dossier2",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Dossier2",
+      "parentId": null,
+      "id": 3,
+      "createdAt": "2025-09-24T15:01:36.024Z",
+      "isDeleted": false
+    },
+    {
+      "name": "1",
+      "parentId": 6,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1",
+      "id": 9,
+      "createdAt": "2025-09-24T19:00:38.848Z",
+      "isDeleted": false
+    },
+    {
+      "name": "2",
+      "parentId": 9,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2",
+      "id": 10,
+      "createdAt": "2025-09-24T19:00:42.771Z",
+      "isDeleted": false
+    },
+    {
+      "name": "3",
+      "parentId": 10,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3",
+      "id": 11,
+      "createdAt": "2025-09-24T19:00:46.233Z",
+      "isDeleted": false
+    },
+    {
+      "name": "4",
+      "parentId": 11,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4",
+      "id": 12,
+      "createdAt": "2025-09-24T19:00:49.614Z",
+      "isDeleted": false
+    },
+    {
+      "name": "5",
+      "parentId": 12,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5",
+      "id": 13,
+      "createdAt": "2025-09-24T19:00:52.611Z",
+      "isDeleted": false
+    },
+    {
+      "name": "6",
+      "parentId": 13,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5/6",
+      "id": 14,
+      "createdAt": "2025-09-24T19:00:55.523Z",
+      "isDeleted": false
+    },
+    {
+      "name": "7",
+      "parentId": 14,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7",
+      "id": 15,
+      "createdAt": "2025-09-24T19:00:58.299Z",
+      "isDeleted": false
+    },
+    {
+      "name": "8",
+      "parentId": 15,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8",
+      "id": 16,
+      "createdAt": "2025-09-24T19:01:01.920Z",
+      "isDeleted": false
+    },
+    {
+      "name": "9",
+      "parentId": 16,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9",
+      "id": 17,
+      "createdAt": "2025-09-24T19:01:04.774Z",
+      "isDeleted": false
+    },
+    {
+      "name": "10",
+      "parentId": 17,
+      "classeurId": null,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10",
+      "id": 18,
+      "createdAt": "2025-09-24T19:01:07.771Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 12,
+      "name": "Dossier1",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Premier Classeur/Dossier1",
+      "parentId": null,
+      "id": 19,
+      "createdAt": "2025-09-24T20:07:04.624Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 12,
+      "name": "Dossier2",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Premier Classeur/Dossier2",
+      "parentId": null,
+      "id": 20,
+      "createdAt": "2025-09-24T20:07:09.577Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 12,
+      "name": "Dossier3",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Premier Classeur/Dossier3",
+      "parentId": null,
+      "id": 21,
+      "createdAt": "2025-09-24T20:07:13.844Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 12,
+      "name": "azezae",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/Premier Classeur/azezae",
+      "parentId": null,
+      "id": 22,
+      "createdAt": "2025-09-24T20:15:26.289Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 13,
+      "name": "Dossié",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/Dossié",
+      "parentId": null,
+      "id": 23,
+      "createdAt": "2025-09-24T20:18:29.029Z",
+      "isDeleted": false
+    }
+  ],
+  "fichiers": [
+    {
+      "dossierId": 2,
+      "name": "screenshot-offers-management-interface.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Racine/screenshot-offers-management-interface.png",
+      "type": "image/png",
+      "size": 173348,
+      "id": 1,
+      "createdAt": "2025-09-23T16:05:18.726Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 1,
+      "name": "sitevitrine.jpg",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/sitevitrine.jpg",
+      "type": "image/jpeg",
+      "size": 119211,
+      "id": 2,
+      "createdAt": "2025-09-23T16:41:58.188Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 1,
+      "name": "sitevitrine.jpg",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/sitevitrine.jpg",
+      "type": "image/jpeg",
+      "size": 119211,
+      "id": 3,
+      "createdAt": "2025-09-23T16:55:10.180Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 1,
+      "name": "Extrait KBis.pdf",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Extrait KBis.pdf",
+      "type": "application/pdf",
+      "size": 18855,
+      "id": 4,
+      "createdAt": "2025-09-23T16:55:34.016Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 1,
+      "name": "FormalitéValidée.pdf",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/FormalitéValidée.pdf",
+      "type": "application/pdf",
+      "size": 253246,
+      "id": 5,
+      "createdAt": "2025-09-23T17:47:10.127Z",
+      "isDeleted": false
+    },
+    {
+      "dossierId": 3,
+      "name": "sitevitrine.jpg",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Dossier2/sitevitrine.jpg",
+      "type": "image/jpeg",
+      "size": 119211,
+      "id": 7,
+      "createdAt": "2025-09-24T16:16:09.679Z",
+      "isDeleted": false
+    },
+    {
+      "dossierId": 3,
+      "name": "screenshot-messaging-with-client.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Dossier2/screenshot-messaging-with-client.png",
+      "type": "image/png",
+      "size": 93470,
+      "id": 8,
+      "createdAt": "2025-09-24T16:16:09.686Z",
+      "isDeleted": false
+    },
+    {
+      "dossierId": 3,
+      "name": "logochantierdirect.jpeg",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/classeur1/Dossier2/logochantierdirect.jpeg",
+      "type": "image/jpeg",
+      "size": 52020,
+      "id": 9,
+      "createdAt": "2025-09-24T16:16:09.689Z",
+      "isDeleted": false
+    },
+    {
+      "name": "ArticleExampleTechAnswers.png",
+      "type": "image/png",
+      "size": 191117,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/ArticleExampleTechAnswers.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 11,
+      "createdAt": "2025-09-24T19:01:17.093Z",
+      "isDeleted": false
+    },
+    {
+      "name": "ArticleExamplePsychoz.png",
+      "type": "image/png",
+      "size": 549198,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/ArticleExamplePsychoz.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 12,
+      "createdAt": "2025-09-24T19:01:17.104Z",
+      "isDeleted": false
+    },
+    {
+      "name": "ArticleExampleNutriWise.png",
+      "type": "image/png",
+      "size": 451539,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/ArticleExampleNutriWise.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 13,
+      "createdAt": "2025-09-24T19:01:17.110Z",
+      "isDeleted": false
+    },
+    {
+      "name": "Oxelya-min.png",
+      "type": "image/png",
+      "size": 225481,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/Oxelya-min.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 14,
+      "createdAt": "2025-09-24T19:01:17.114Z",
+      "isDeleted": false
+    },
+    {
+      "name": "signature_michael.png",
+      "type": "image/png",
+      "size": 35524,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/signature_michael.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 15,
+      "createdAt": "2025-09-24T19:01:17.116Z",
+      "isDeleted": false
+    },
+    {
+      "name": "théo_vir.png",
+      "type": "image/png",
+      "size": 13422,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/théo_vir.png",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 16,
+      "createdAt": "2025-09-24T19:01:17.117Z",
+      "isDeleted": false
+    },
+    {
+      "name": "devis-68d13b8ac37abe1ade898489.pdf",
+      "type": "application/pdf",
+      "size": 38861,
+      "path": "archives/OugaBouga/1/2/3/4/5/6/7/8/9/10/devis-68d13b8ac37abe1ade898489.pdf",
+      "classeurId": null,
+      "dossierId": 18,
+      "id": 17,
+      "createdAt": "2025-09-24T19:01:17.119Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 13,
+      "name": "AvancéeProjet.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/AvancéeProjet.png",
+      "type": "image/png",
+      "size": 161551,
+      "id": 18,
+      "createdAt": "2025-09-24T20:18:50.651Z",
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:19:04.220Z"
+    },
+    {
+      "classeurId": 13,
+      "name": "AvancéeProjet.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/AvancéeProjet.png",
+      "type": "image/png",
+      "size": 161551,
+      "id": 19,
+      "createdAt": "2025-09-24T20:18:50.659Z",
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:19:06.168Z"
+    },
+    {
+      "classeurId": 13,
+      "name": "IMG_1066.jpeg",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/IMG_1066.jpeg",
+      "type": "image/jpeg",
+      "size": 1181929,
+      "id": 20,
+      "createdAt": "2025-09-24T20:18:50.669Z",
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:19:07.602Z"
+    },
+    {
+      "classeurId": 13,
+      "name": "favicon-48x48.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/favicon-48x48.png",
+      "type": "image/png",
+      "size": 4235,
+      "id": 21,
+      "createdAt": "2025-09-24T20:18:50.671Z",
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:19:09.204Z"
+    },
+    {
+      "dossierId": 23,
+      "name": "GoogleSEO.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/Dossié/GoogleSEO.png",
+      "type": "image/png",
+      "size": 450048,
+      "id": 22,
+      "createdAt": "2025-09-24T20:19:59.851Z",
+      "isDeleted": false
+    },
+    {
+      "classeurId": 13,
+      "name": "AvancéeProjet.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/AvancéeProjet.png",
+      "type": "image/png",
+      "size": 161551,
+      "id": 23,
+      "createdAt": "2025-09-24T20:23:11.495Z",
+      "isDeleted": true,
+      "deletedAt": "2025-09-24T20:27:53.460Z"
+    },
+    {
+      "classeurId": 13,
+      "name": "OxelyaCap.png",
+      "path": "/home/margoul1/Documents/Classiflyer/Classiflyer/All_Classeurs/Deuxième Classeur Archivé/OxelyaCap.png",
+      "type": "image/png",
+      "size": 598009,
+      "id": 24,
+      "createdAt": "2025-09-24T20:28:00.358Z",
+      "isDeleted": false
+    }
+  ],
+  "archiveFolders": [],
+  "settings": {
+    "rootPath": "/home/margoul1/Documents/Classiflyer",
+    "viewMode": "grid"
+  },
+  "nextId": {
+    "classeurs": 15,
+    "dossiers": 24,
+    "fichiers": 25,
+    "archiveFolders": 8
+  }
+}
