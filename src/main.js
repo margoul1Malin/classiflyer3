@@ -123,6 +123,75 @@ function registerIpcHandlers() {
     return result.filePaths.map(path => ({ path }));
   });
 
+  // Créer un classeur à partir d'un dossier existant
+  ipcMain.handle('classeurs:createFromFolder', async (_event, payload) => {
+    // payload: { name, primaryColor, secondaryColor, tertiaryColor, folderPath }
+    if (!payload || !payload.folderPath || !payload.name) {
+      throw new Error('Données manquantes: name et folderPath requis');
+    }
+    const db = await readDb();
+    const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
+    const classeursPath = path.join(rootPath, 'classeurs');
+    await fsp.mkdir(classeursPath, { recursive: true });
+
+    const targetPath = path.join(classeursPath, payload.name);
+    // Copie récursive du dossier source dans le répertoire des classeurs
+    await fsp.cp(payload.folderPath, targetPath, { recursive: true });
+
+    // Construire la structure de dossiers/fichiers imbriqués
+    async function scanFolder(absPath) {
+      const entries = await fsp.readdir(absPath, { withFileTypes: true });
+      const folders = {};
+      const files = {};
+      for (const entry of entries) {
+        const entryPath = path.join(absPath, entry.name);
+        if (entry.isDirectory()) {
+          const { folders: subFolders, files: subFiles } = await scanFolder(entryPath);
+          const folderId = `dossier_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+          folders[folderId] = {
+            name: entry.name,
+            sys_path: entryPath,
+            folders: subFolders,
+            files: subFiles
+          };
+        } else {
+          const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+          files[fileId] = {
+            name: entry.name,
+            sys_path: entryPath,
+            mime: null,
+            createdAt: Date.now()
+          };
+        }
+      }
+      return { folders, files };
+    }
+
+    const scanned = await scanFolder(targetPath);
+
+    // Créer l'objet classeur
+    const classeurId = `classeur_${db.nextId?.classeurs || 1}`;
+    db.nextId = db.nextId || {}; db.nextId.classeurs = (db.nextId.classeurs || 1) + 1;
+    const newClasseur = {
+      name: payload.name,
+      sys_path: targetPath,
+      app_path: `/mes_classeurs/${payload.name}`,
+      primaryColor: payload.primaryColor || '#0ea5e9',
+      secondaryColor: payload.secondaryColor || '#38bdf8',
+      tertiaryColor: payload.tertiaryColor || '#0b1220',
+      folders: scanned.folders,
+      files: Object.values(scanned.files),
+      archived: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    db.mes_classeurs = db.mes_classeurs || {};
+    db.mes_classeurs[classeurId] = newClasseur;
+    await writeDb(db);
+    return { id: classeurId, ...newClasseur };
+  });
+
   // DB helpers
   const getDbPath = async () => {
     const cfg = await readAppConfig();

@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('classiflyer', {
   // Classeurs API
   listClasseurs: async () => ipcRenderer.invoke('classeurs:list'),
   createClasseur: async (payload) => ipcRenderer.invoke('classeurs:create', payload),
+  createClasseurFromFolder: async (payload) => ipcRenderer.invoke('classeurs:createFromFolder', payload),
   updateClasseur: async (id, updates) => ipcRenderer.invoke('classeurs:update', id, updates),
   deleteClasseur: async (id) => ipcRenderer.invoke('classeurs:delete', id),
   archiveClasseur: async (id, archiveFolderId = null) => ipcRenderer.invoke('classeurs:archive', id, archiveFolderId),

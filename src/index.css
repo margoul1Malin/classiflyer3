@@ -78,22 +78,46 @@ body {
 }
 
 /* Classeur page */
+.classeur-header {
+  margin-bottom: 8px;
+}
+
 .classeur-layout {
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 12px;
-  height: calc(100vh - 100px);
+  height: calc(100vh - 140px);
 }
 .viewer { background: #ffffff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
 .viewer-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .viewer-pdf-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
 .viewer-title { font-weight: 600; }
 .viewer-canvas { flex: 1; overflow: auto; overflow-y: auto; background: #f1f5f9; border-radius: 8px; display: grid; place-items: center; }
+.viewer-canvas .excel-container { place-self: stretch; }
 .viewer-canvas img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .viewer-canvas canvas { max-width: 100%; max-height: 100%; }
 .viewer-canvas table { border-collapse: collapse; width: 100%; }
 .viewer-canvas th, .viewer-canvas td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 .viewer-canvas th { background-color: #f2f2f2; }
+
+/* Excel Viewer Styles */
+.excel-container { background: white; border-radius: 8px; padding: 8px; height: 100%; display: flex; flex-direction: column; min-height: 0; }
+.excel-tabs { display: flex; background: #f8f9fa; border-bottom: 2px solid #e9ecef; overflow-x: auto; padding: 0 8px; margin-bottom: 8px; }
+.excel-tab { padding: 12px 20px; margin: 4px 2px 0; border: none; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; transition: all 0.2s ease; white-space: nowrap; }
+.excel-tab:hover { background: #e2e8f0 !important; transform: translateY(-1px); }
+.excel-tab.active { background: #ffffff !important; color: #2563eb !important; font-weight: 600; border-bottom: 2px solid #2563eb; }
+.excel-content { background: white; flex: 1; min-height: 0; display: flex; }
+.excel-content > div { overflow: auto; height: 100%; width: 100%; }
+.excel-content table { font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; min-width: 600px; }
+.excel-content td, .excel-content th { border: 1px solid #d1d5db; padding: 8px 12px; max-width: 200px; word-wrap: break-word; }
+.excel-content th { background: #f8f9fa; font-weight: 600; color: #374151; }
+.excel-content tr:nth-child(even) td { background: #f9fafb; }
+.excel-content tr:hover td { background: #f3f4f6; }
+
+/* En-têtes Excel collants */
+.excel-content th[style*="position: sticky"] { box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+.excel-content th[style*="left: 0"] { box-shadow: 1px 0 3px rgba(0,0,0,0.1); }
+.excel-content th[style*="z-index: 3"] { box-shadow: 1px 1px 3px rgba(0,0,0,0.15); }
 
 .classeur-sidebar { background: #ffffff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
 .sidebar-header { display: grid; gap: 8px; }

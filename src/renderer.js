@@ -137,7 +137,12 @@ function initClasseursView() {
     renderClasseurs(grid, filtered);
   }
 
-  btnCreate.addEventListener('click', () => openCreateModal(refresh));
+  btnCreate.addEventListener('click', () => {
+    openCreateChoiceModal({
+      onBlank: () => openCreateModal(refresh),
+      onFromFolder: () => openCreateFromFolderModal(refresh)
+    });
+  });
 
   if (searchInput instanceof HTMLInputElement) {
     searchInput.addEventListener('input', refresh);
@@ -146,6 +151,122 @@ function initClasseursView() {
   refresh();
 }
 
+function openCreateChoiceModal({ onBlank, onFromFolder }) {
+  const modal = document.createElement('div');
+  modal.className = 'modal is-visible';
+  modal.style.cssText = 'position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;';
+  modal.innerHTML = `
+    <div class="modal-backdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.35); z-index:1;"></div>
+    <div class="modal-content" style="position:relative; z-index:2; max-width: 520px; width:90%; background:#fff; border-radius:12px; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+      <h3>Créer un classeur</h3>
+      <p>Souhaitez-vous créer un classeur vierge ou à partir d'un dossier ?</p>
+      <div style="display:flex; gap:12px; margin-top:16px;">
+        <button id="btn-create-blank" class="btn primary" style="flex:1">Classeur vierge</button>
+        <button id="btn-create-from-folder" class="btn" style="flex:1">Depuis un dossier</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.querySelector('#btn-create-blank')?.addEventListener('click', () => { close(); setTimeout(() => { onBlank && onBlank(); }, 0); }, { once:true });
+  modal.querySelector('#btn-create-from-folder')?.addEventListener('click', () => { close(); setTimeout(() => { onFromFolder && onFromFolder(); }, 0); }, { once:true });
+  modal.querySelector('.modal-backdrop')?.addEventListener('click', close, { once:true });
+}
+
+function openCreateFromFolderModal(onCreated) {
+  const modal = document.createElement('div');
+  modal.className = 'modal is-visible';
+  modal.style.cssText = 'position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;';
+  modal.innerHTML = `
+    <div class="modal-backdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.35);"></div>
+    <div class="modal-content" style="position:relative; max-width: 760px; width:92%; background:#fff; border-radius:12px; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); display:grid; grid-template-columns: 1.2fr 1fr; gap:16px;">
+      <div>
+        <h3 style="margin-top:0;">Nouveau classeur depuis un dossier</h3>
+        <label style="display:block; margin-bottom:10px;">Nom du classeur
+          <input id="input-name" type="text" placeholder="Nom" style="width:100%; margin-top:6px;" />
+        </label>
+        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px;">
+          <label>Couleur principale <input id="input-primary" type="color" value="#0ea5e9" /></label>
+          <label>Secondaire <input id="input-secondary" type="color" value="#38bdf8" /></label>
+          <label>Tertiaire <input id="input-tertiary" type="color" value="#0b1220" /></label>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center; margin-top:12px;">
+          <input id="input-folder-path" type="text" placeholder="Aucun dossier sélectionné" readonly style="flex:1;" />
+          <button id="btn-choose-folder" class="btn">Choisir un dossier</button>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+          <button id="btn-cancel" class="btn">Annuler</button>
+          <button id="btn-create" class="btn primary" disabled>Créer</button>
+        </div>
+      </div>
+      <div>
+        <div id="preview-from-folder" class="card" style="position:sticky; top:0; border-right: 8px solid #38bdf8; background:#0ea5e9; color:#0b1220; padding:16px; border-radius:12px;">
+          <div class="card-title" style="font-weight:700;">Aperçu</div>
+          <div style="opacity:0.8; font-size:12px; margin-top:8px;">Le style du classeur s'appliquera à la création.</div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+
+  const nameInput = modal.querySelector('#input-name');
+  const primaryInput = modal.querySelector('#input-primary');
+  const secondaryInput = modal.querySelector('#input-secondary');
+  const tertiaryInput = modal.querySelector('#input-tertiary');
+  const folderInput = modal.querySelector('#input-folder-path');
+  const chooseBtn = modal.querySelector('#btn-choose-folder');
+  const cancelBtn = modal.querySelector('#btn-cancel');
+  const createBtn = modal.querySelector('#btn-create');
+  const preview = modal.querySelector('#preview-from-folder');
+
+  function updatePreview() {
+    const pc = primaryInput instanceof HTMLInputElement ? primaryInput.value : '#0ea5e9';
+    const sc = secondaryInput instanceof HTMLInputElement ? secondaryInput.value : '#38bdf8';
+    const tc = tertiaryInput instanceof HTMLInputElement ? tertiaryInput.value : '#0b1220';
+    if (preview) {
+      preview.style.background = pc;
+      preview.style.borderRight = `8px solid ${sc}`;
+      preview.style.color = tc;
+      const t = preview.querySelector('.card-title');
+      if (t && nameInput instanceof HTMLInputElement) t.textContent = nameInput.value || 'Aperçu';
+    }
+  }
+  [nameInput, primaryInput, secondaryInput, tertiaryInput].forEach((el) => {
+    el && el.addEventListener('input', updatePreview);
+    el && el.addEventListener('change', updatePreview);
+  });
+  updatePreview();
+
+  chooseBtn?.addEventListener('click', async () => {
+    const dir = await window.classiflyer.chooseDirectory();
+    if (dir) folderInput.value = dir;
+    if (createBtn instanceof HTMLButtonElement) createBtn.disabled = !(nameInput?.value?.trim()) || !(folderInput?.value?.trim());
+  });
+
+  nameInput?.addEventListener('input', () => {
+    if (createBtn instanceof HTMLButtonElement) createBtn.disabled = !(nameInput?.value?.trim()) || !(folderInput?.value?.trim());
+  });
+
+  cancelBtn?.addEventListener('click', close, { once:true });
+  modal.querySelector('.modal-backdrop')?.addEventListener('click', close, { once:true });
+
+  createBtn?.addEventListener('click', async () => {
+    const name = nameInput?.value?.trim();
+    const folderPath = folderInput?.value?.trim();
+    const primaryColor = primaryInput?.value || '#0ea5e9';
+    const secondaryColor = secondaryInput?.value || '#38bdf8';
+    const tertiaryColor = tertiaryInput?.value || '#0b1220';
+    if (!name || !folderPath) return;
+    try {
+      await window.classiflyer.createClasseurFromFolder({ name, folderPath, primaryColor, secondaryColor, tertiaryColor });
+      close();
+      typeof onCreated === 'function' && (await onCreated());
+    } catch (e) {
+      alert('Erreur: ' + (e?.message || 'Création impossible'));
+    }
+  }, { once:true });
+}
 function renderClasseurs(container, classeurs) {
   container.innerHTML = '';
   for (const item of classeurs) {
@@ -337,10 +458,16 @@ function openEditModal(classeur, onSaved) {
 let currentClasseurId = null;
 let currentFileList = [];
 let currentFileIndex = -1;
+let currentClasseurOrigin = 'mes-classeurs'; // 'mes-classeurs' ou 'archives'
 
-async function openClasseurView(id) {
+async function openClasseurView(id, origin = 'mes-classeurs') {
   currentClasseurId = id;
+  currentClasseurOrigin = origin;
   selectView('view-classeur');
+  
+  // Mettre à jour le bouton de retour
+  updateBackButton();
+  
   const data = await window.classiflyer.getClasseur(id);
   renderClasseurTree(data);
   const allFiles = collectAllFiles(data);
@@ -354,6 +481,25 @@ async function openClasseurView(id) {
   }
   setupViewerNav();
   setupClasseurActions();
+}
+
+function updateBackButton() {
+  const backButton = document.getElementById('btn-back-to-list');
+  if (!backButton) return;
+  
+  if (currentClasseurOrigin === 'archives') {
+    backButton.textContent = '← Retour aux Archives';
+    backButton.onclick = () => {
+      selectView('view-archives');
+      updateActiveNav(document.querySelector('[data-view="view-archives"]'));
+    };
+  } else {
+    backButton.textContent = '← Retour aux Mes Classeurs';
+    backButton.onclick = () => {
+      selectView('view-classeurs');
+      updateActiveNav(document.querySelector('[data-view="view-classeurs"]'));
+    };
+  }
 }
 
 function collectAllFiles(classeur) {
@@ -963,47 +1109,342 @@ async function renderExcel(filePath, canvas) {
     
     // Parser le fichier Excel
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
+    const sheetNames = workbook.SheetNames;
     
-    // Convertir en HTML
-    const html = XLSX.utils.sheet_to_html(worksheet);
+    // Créer le conteneur avec onglets
+    const excelContainer = document.createElement('div');
+    excelContainer.className = 'excel-container';
+    excelContainer.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+    `;
     
-    // Afficher le tableau
-    canvas.innerHTML = html;
+    // Créer les onglets si plusieurs feuilles
+    let tabsContainer = null;
+    if (sheetNames.length > 1) {
+      tabsContainer = document.createElement('div');
+      tabsContainer.className = 'excel-tabs';
+      tabsContainer.style.cssText = `
+        display: flex;
+        background: #f8f9fa;
+        border-bottom: 2px solid #e9ecef;
+        overflow-x: auto;
+        flex-shrink: 0;
+        padding: 0 8px;
+      `;
+      
+      sheetNames.forEach((sheetName, index) => {
+        const tab = document.createElement('button');
+        tab.className = `excel-tab ${index === 0 ? 'active' : ''}`;
+        tab.textContent = sheetName;
+        tab.style.cssText = `
+          padding: 12px 20px;
+          margin: 4px 2px 0;
+          border: none;
+          background: ${index === 0 ? '#ffffff' : '#e9ecef'};
+          color: ${index === 0 ? '#2563eb' : '#6b7280'};
+          border-radius: 8px 8px 0 0;
+          cursor: pointer;
+          font-weight: ${index === 0 ? '600' : '400'};
+          font-size: 14px;
+          border-bottom: ${index === 0 ? '2px solid #2563eb' : '2px solid transparent'};
+          transition: all 0.2s ease;
+          white-space: nowrap;
+        `;
+        
+        tab.addEventListener('click', () => {
+          // Désactiver tous les onglets
+          tabsContainer.querySelectorAll('.excel-tab').forEach(t => {
+            t.style.background = '#e9ecef';
+            t.style.color = '#6b7280';
+            t.style.fontWeight = '400';
+            t.style.borderBottom = '2px solid transparent';
+            t.classList.remove('active');
+          });
+          
+          // Activer l'onglet cliqué
+          tab.style.background = '#ffffff';
+          tab.style.color = '#2563eb';
+          tab.style.fontWeight = '600';
+          tab.style.borderBottom = '2px solid #2563eb';
+          tab.classList.add('active');
+          
+          // Afficher la feuille correspondante
+          renderSheet(sheetName, contentContainer, XLSX, workbook);
+        });
+        
+        tabsContainer.appendChild(tab);
+      });
+      
+      excelContainer.appendChild(tabsContainer);
+    }
+    
+    // Créer le conteneur pour le contenu de la feuille (responsive)
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'excel-content';
+    contentContainer.style.cssText = `
+      padding: 8px 0 0 0;
+      background: white;
+      flex: 1;
+      min-height: 0;
+      display: flex;
+    `;
+    
+    excelContainer.appendChild(contentContainer);
+    
+    // Fonction pour afficher une feuille
+    function renderSheet(sheetName, container, XLSX, workbook) {
+      const worksheet = workbook.Sheets[sheetName];
+      
+      // Mettre à jour le titre avec le nom de l'onglet
+      const titleElement = document.getElementById('viewer-title');
+      if (titleElement) {
+        const fileName = filePath.split(/[/\\]/).pop() || 'Fichier Excel';
+        titleElement.textContent = `${fileName} - ${sheetName}`;
+      }
+      
+      // Obtenir les données de la feuille
+      const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+      const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '', raw: false });
+      
+      // Fonction pour convertir un numéro de colonne en lettre (0->A, 1->B, etc.)
+      function numberToColumnLetter(num) {
+        let result = '';
+        while (num >= 0) {
+          result = String.fromCharCode(65 + (num % 26)) + result;
+          num = Math.floor(num / 26) - 1;
+        }
+        return result;
+      }
+      
+      // Créer le tableau avec en-têtes
+      const table = document.createElement('table');
+      table.style.cssText = `
+        border-collapse: collapse;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+        font-size: 13px;
+        background: white;
+        min-width: fit-content;
+        width: auto;
+      `;
+      
+      // Calculer le nombre de colonnes nécessaires
+      const maxCols = Math.max(range.e.c + 1, sheetData.reduce((max, row) => Math.max(max, row.length), 0));
+      const maxRows = Math.max(range.e.r + 1, sheetData.length);
+      
+      // Créer la ligne d'en-têtes de colonnes (A, B, C, ...)
+      const headerRow = document.createElement('tr');
+      
+      // Cellule vide en haut à gauche
+      const cornerCell = document.createElement('th');
+      cornerCell.style.cssText = `
+        background: #e5e7eb;
+        border: 1px solid #d1d5db;
+        padding: 6px 8px;
+        text-align: center;
+        font-weight: 600;
+        color: #6b7280;
+        min-width: 40px;
+        width: 40px;
+        position: sticky;
+        left: 0;
+        z-index: 3;
+      `;
+      headerRow.appendChild(cornerCell);
+      
+      // En-têtes de colonnes (A, B, C, ...)
+      for (let col = 0; col < maxCols; col++) {
+        const colHeader = document.createElement('th');
+        colHeader.textContent = numberToColumnLetter(col);
+        colHeader.style.cssText = `
+          background: #e5e7eb;
+          border: 1px solid #d1d5db;
+          padding: 6px 8px;
+          text-align: center;
+          font-weight: 600;
+          color: #6b7280;
+          min-width: 100px;
+          width: 120px;
+          position: sticky;
+          top: 0;
+          z-index: 2;
+        `;
+        headerRow.appendChild(colHeader);
+      }
+      table.appendChild(headerRow);
+      
+      // Créer les lignes de données
+      for (let row = 0; row < maxRows; row++) {
+        const tr = document.createElement('tr');
+        
+        // Numéro de ligne (1, 2, 3, ...)
+        const rowHeader = document.createElement('th');
+        rowHeader.textContent = row + 1;
+        rowHeader.style.cssText = `
+          background: #e5e7eb;
+          border: 1px solid #d1d5db;
+          padding: 6px 8px;
+          text-align: center;
+          font-weight: 600;
+          color: #6b7280;
+          min-width: 40px;
+          width: 40px;
+          position: sticky;
+          left: 0;
+          z-index: 1;
+        `;
+        tr.appendChild(rowHeader);
+        
+        // Cellules de données
+        for (let col = 0; col < maxCols; col++) {
+          const td = document.createElement('td');
+          const cellValue = sheetData[row] && sheetData[row][col] !== undefined ? sheetData[row][col] : '';
+          td.textContent = cellValue;
+          td.style.cssText = `
+            border: 1px solid #d1d5db;
+            padding: 6px 12px;
+            text-align: left;
+            vertical-align: top;
+            background: white;
+            min-width: 100px;
+            width: 120px;
+            max-width: 300px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            white-space: pre-wrap;
+          `;
+          tr.appendChild(td);
+        }
+        
+        // Effet hover sur les lignes
+        tr.addEventListener('mouseenter', () => {
+          tr.style.backgroundColor = '#f3f4f6';
+        });
+        tr.addEventListener('mouseleave', () => {
+          tr.style.backgroundColor = '';
+        });
+        
+        table.appendChild(tr);
+      }
+      
+      // Wrapper avec défilement optimisé
+      const tableWrapper = document.createElement('div');
+      
+      tableWrapper.style.cssText = `
+        overflow: auto;
+        height: 100%;
+        width: 100%;
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        min-height: 0;
+      `;
+      
+      // Améliorer le style des scrollbars sur Webkit
+      tableWrapper.style.cssText += `
+        -webkit-overflow-scrolling: touch;
+      `;
+      
+      // Ajouter les styles de scrollbar personnalisés via une balise style
+      if (!document.getElementById('excel-scrollbar-styles')) {
+        const scrollbarStyles = document.createElement('style');
+        scrollbarStyles.id = 'excel-scrollbar-styles';
+        scrollbarStyles.textContent = `
+          .excel-content > div::-webkit-scrollbar {
+            width: 12px;
+            height: 12px;
+          }
+          .excel-content > div::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 6px;
+          }
+          .excel-content > div::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 6px;
+            border: 2px solid #f1f5f9;
+          }
+          .excel-content > div::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+          }
+          .excel-content > div::-webkit-scrollbar-corner {
+            background: #f1f5f9;
+          }
+        `;
+        document.head.appendChild(scrollbarStyles);
+      }
+      
+      tableWrapper.appendChild(table);
+      
+      // Fonction pour fixer une hauteur PIXEL pour activer overflow
+      const updateWrapperHeight = () => {
+        try {
+          const canvasRect = canvas.getBoundingClientRect();
+          const tabsH = tabsContainer ? tabsContainer.offsetHeight : 0;
+          // marge interne + nav + petite marge
+          const paddingReserve = 16;
+          const maxH = Math.max(180, Math.floor(canvasRect.height - tabsH - paddingReserve));
+          tableWrapper.style.maxHeight = `${maxH}px`;
+        } catch (_) {}
+      };
+
+      // Initialisation et écoute du resize
+      updateWrapperHeight();
+      let excelResizeHandler = null;
+      excelResizeHandler = () => updateWrapperHeight();
+      window.addEventListener('resize', excelResizeHandler);
+
+      // Nettoyer les listeners quand on change de fichier/feuille
+      // (on attache un attribut pour retrouver/retirer si nécessaire)
+      tableWrapper.dataset.excelResizeBound = '1';
+
+      container.innerHTML = '';
+      container.appendChild(tableWrapper);
+    }
+    
+    // Afficher la première feuille par défaut
+    renderSheet(sheetNames[0], contentContainer, XLSX, workbook);
+    
+    // Remplacer le contenu du canvas
+    canvas.innerHTML = '';
+    canvas.appendChild(excelContainer);
     
     // Afficher les contrôles de zoom pour Excel
     const zoomControls = document.getElementById('zoom-controls');
-    zoomControls.style.display = 'flex';
-    
-    let currentZoom = 1;
-    
-    // Fonction pour mettre à jour le zoom Excel
-    const updateExcelZoom = (zoom) => {
-      currentZoom = zoom;
-      const table = canvas.querySelector('table');
-      if (table) {
-        table.style.transform = `scale(${zoom})`;
-        table.style.transformOrigin = 'top left';
-      }
-      document.getElementById('zoom-level').textContent = `${Math.round(zoom * 100)}%`;
-    };
-    
-    // Boutons de zoom Excel
-    document.getElementById('zoom-in').onclick = () => {
-      updateExcelZoom(Math.min(currentZoom * 1.2, 3));
-    };
-    
-    document.getElementById('zoom-out').onclick = () => {
-      updateExcelZoom(Math.max(currentZoom / 1.2, 0.3));
-    };
-    
-    document.getElementById('zoom-reset').onclick = () => {
+    if (zoomControls) {
+      zoomControls.style.display = 'flex';
+      
+      let currentZoom = 1;
+      
+      // Fonction pour mettre à jour le zoom Excel
+      const updateExcelZoom = (zoom) => {
+        currentZoom = zoom;
+        const table = contentContainer.querySelector('table');
+        if (table) {
+          table.style.transform = `scale(${zoom})`;
+          table.style.transformOrigin = 'top left';
+        }
+        document.getElementById('zoom-level').textContent = `${Math.round(zoom * 100)}%`;
+      };
+      
+      // Boutons de zoom Excel
+      document.getElementById('zoom-in').onclick = () => {
+        updateExcelZoom(Math.min(currentZoom * 1.2, 3));
+      };
+      
+      document.getElementById('zoom-out').onclick = () => {
+        updateExcelZoom(Math.max(currentZoom / 1.2, 0.3));
+      };
+      
+      document.getElementById('zoom-reset').onclick = () => {
+        updateExcelZoom(1);
+      };
+      
+      // Initialiser l'affichage du zoom Excel
       updateExcelZoom(1);
-    };
-    
-    // Initialiser l'affichage du zoom Excel
-    updateExcelZoom(1);
+    }
     
     // Mettre en surbrillance le fichier actuel dans la sidebar
     highlightCurrentFile(filePath);
@@ -1011,7 +1452,17 @@ async function renderExcel(filePath, canvas) {
   } catch (error) {
     console.error('Excel rendering error:', error);
     const hint = document.createElement('div');
-    hint.textContent = 'Erreur lors du chargement du fichier Excel.';
+    hint.style.cssText = `
+      padding: 40px;
+      text-align: center;
+      color: #ef4444;
+      font-size: 16px;
+      background: #fef2f2;
+      border: 2px dashed #fca5a5;
+      border-radius: 8px;
+      margin: 20px;
+    `;
+    hint.textContent = '❌ Erreur lors du chargement du fichier Excel.';
     canvas.appendChild(hint);
   }
 }
@@ -1470,7 +1921,7 @@ function renderArchivedClasseurs(container, archives) {
     card.appendChild(menu);
 
     // Clic sur le classeur pour l'ouvrir
-    card.addEventListener('click', () => openClasseurView(item.id));
+    card.addEventListener('click', () => openClasseurView(item.id, 'archives'));
     container.appendChild(card);
   }
 }

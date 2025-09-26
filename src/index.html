@@ -28,17 +28,22 @@
         <div id="classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
       </section>
       <section id="view-classeur" class="view" role="region" aria-label="Classeur">
+        <div class="classeur-header">
+          <button id="btn-back-to-list" class="btn" style="margin-bottom: 12px;">
+            ← Retour aux Mes Classeurs
+          </button>
+        </div>
         <div class="classeur-layout">
           <div class="viewer">
             <div class="viewer-nav">
               <button id="viewer-prev" class="btn">← Précédent</button>
               <div style="display: flex; align-items: center; gap: 8px;">
                 <div id="viewer-title" class="viewer-title"></div>
-                <div id="zoom-controls" style="display: none; gap: 4px;">
-                  <button id="zoom-out" class="btn" style="padding: 4px 8px; font-size: 14px;">-</button>
-                  <span id="zoom-level" style="font-size: 12px; min-width: 40px; text-align: center;">100%</span>
-                  <button id="zoom-in" class="btn" style="padding: 4px 8px; font-size: 14px;">+</button>
-                  <button id="zoom-reset" class="btn" style="padding: 4px 8px; font-size: 12px;" title="Ajuster">⌂</button>
+                <div id="zoom-controls" style="display: none; align-items: center; gap: 4px;">
+                  <button id="zoom-out" class="btn" style="padding: 4px 8px; font-size: 14px; height: 28px;">-</button>
+                  <span id="zoom-level" style="font-size: 12px; min-width: 40px; text-align: center; line-height: 1;">100%</span>
+                  <button id="zoom-in" class="btn" style="padding: 4px 8px; font-size: 14px; height: 28px;">+</button>
+                  <button id="zoom-reset" class="btn" style="padding: 4px 8px; font-size: 12px; height: 28px;" title="Ajuster">⌂</button>
                 </div>
               </div>
               <button id="viewer-next" class="btn">Suivant →</button>
