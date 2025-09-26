@@ -469,11 +469,14 @@ function registerIpcHandlers() {
       targetPath = path.join(archivesPath, current.name);
     }
     
+    // Sauvegarder l'ancien chemin pour mise à jour des références
+    const oldPath = current.sys_path;
+    
     // Déplacer le dossier physique
     await fsp.mkdir(path.dirname(targetPath), { recursive: true });
     await fsp.rename(current.sys_path, targetPath);
     
-    // Mettre à jour les chemins
+    // Mettre à jour les chemins du classeur
     current.sys_path = targetPath;
     current.app_path = archiveFolderId 
       ? `/archives/${db.archives.folders[archiveFolderId].name}/${current.name}`
@@ -482,6 +485,43 @@ function registerIpcHandlers() {
     current.archivedAt = Date.now();
     current.updatedAt = Date.now();
     current.archiveFolderId = archiveFolderId || null;
+    
+    // Fonction récursive pour mettre à jour les chemins des dossiers et fichiers imbriqués
+    function updateNestedPaths(folders, files, oldBasePath, newBasePath) {
+      // Mettre à jour les dossiers
+      if (folders) {
+        for (const [folderId, folder] of Object.entries(folders)) {
+          if (folder.sys_path && folder.sys_path.startsWith(oldBasePath)) {
+            folder.sys_path = folder.sys_path.replace(oldBasePath, newBasePath);
+            
+            // Récursivement mettre à jour les sous-dossiers et fichiers
+            updateNestedPaths(folder.folders, folder.files, oldBasePath, newBasePath);
+          }
+        }
+      }
+      
+      // Mettre à jour les fichiers
+      if (files) {
+        if (Array.isArray(files)) {
+          // Format tableau
+          for (const file of files) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        } else {
+          // Format objet
+          for (const [fileId, file] of Object.entries(files)) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        }
+      }
+    }
+    
+    // Mettre à jour tous les chemins imbriqués dans ce classeur
+    updateNestedPaths(current.folders, current.files, oldPath, targetPath);
     
     // Déplacer dans la DB : de mes_classeurs vers archives
     db.archives = db.archives || { folders: {}, classeurs: {} };
@@ -511,17 +551,57 @@ function registerIpcHandlers() {
     const classeursPath = path.join(rootPath, 'classeurs');
     const targetPath = path.join(classeursPath, current.name);
     
+    // Sauvegarder l'ancien chemin pour mise à jour des références
+    const oldPath = current.sys_path;
+    
     // Déplacer le dossier physique
     await fsp.mkdir(classeursPath, { recursive: true });
     await fsp.rename(current.sys_path, targetPath);
     
-    // Mettre à jour les chemins
+    // Mettre à jour les chemins du classeur
     current.sys_path = targetPath;
     current.app_path = `/mes_classeurs/${current.name}`;
     current.archived = false;
     current.archivedAt = null;
     current.archiveFolderId = null;
     current.updatedAt = Date.now();
+    
+    // Fonction récursive pour mettre à jour les chemins des dossiers et fichiers imbriqués
+    function updateNestedPaths(folders, files, oldBasePath, newBasePath) {
+      // Mettre à jour les dossiers
+      if (folders) {
+        for (const [folderId, folder] of Object.entries(folders)) {
+          if (folder.sys_path && folder.sys_path.startsWith(oldBasePath)) {
+            folder.sys_path = folder.sys_path.replace(oldBasePath, newBasePath);
+            
+            // Récursivement mettre à jour les sous-dossiers et fichiers
+            updateNestedPaths(folder.folders, folder.files, oldBasePath, newBasePath);
+          }
+        }
+      }
+      
+      // Mettre à jour les fichiers
+      if (files) {
+        if (Array.isArray(files)) {
+          // Format tableau
+          for (const file of files) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        } else {
+          // Format objet
+          for (const [fileId, file] of Object.entries(files)) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        }
+      }
+    }
+    
+    // Mettre à jour tous les chemins imbriqués dans ce classeur
+    updateNestedPaths(current.folders, current.files, oldPath, targetPath);
     
     // Déplacer dans la DB : de archives vers mes_classeurs
     db.mes_classeurs = db.mes_classeurs || {};
@@ -673,14 +753,54 @@ function registerIpcHandlers() {
       targetFolderId = null; // Assurer que c'est null pour la racine
     }
 
+    // Sauvegarder l'ancien chemin pour mise à jour des références
+    const oldPath = classeur.sys_path;
+
     // Déplacer le dossier physique
     await fsp.rename(classeur.sys_path, newPath);
 
-    // Mettre à jour la DB
+    // Mettre à jour les chemins du classeur
     classeur.sys_path = newPath;
     classeur.app_path = newAppPath;
     classeur.archiveFolderId = targetFolderId;
     classeur.updatedAt = Date.now();
+
+    // Fonction récursive pour mettre à jour les chemins des dossiers et fichiers imbriqués
+    function updateNestedPaths(folders, files, oldBasePath, newBasePath) {
+      // Mettre à jour les dossiers
+      if (folders) {
+        for (const [folderId, folder] of Object.entries(folders)) {
+          if (folder.sys_path && folder.sys_path.startsWith(oldBasePath)) {
+            folder.sys_path = folder.sys_path.replace(oldBasePath, newBasePath);
+            
+            // Récursivement mettre à jour les sous-dossiers et fichiers
+            updateNestedPaths(folder.folders, folder.files, oldBasePath, newBasePath);
+          }
+        }
+      }
+      
+      // Mettre à jour les fichiers
+      if (files) {
+        if (Array.isArray(files)) {
+          // Format tableau
+          for (const file of files) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        } else {
+          // Format objet
+          for (const [fileId, file] of Object.entries(files)) {
+            if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+              file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+            }
+          }
+        }
+      }
+    }
+    
+    // Mettre à jour tous les chemins imbriqués dans ce classeur
+    updateNestedPaths(classeur.folders, classeur.files, oldPath, newPath);
 
     await writeDb(db);
     return classeur;
