@@ -7,6 +7,7 @@ module.exports = {
     icon: './src/assets/icon',
     name: 'ClassiFlyer',
     executableName: 'classiflyer',
+    devTools: false, // Désactiver les DevTools en production
   },
   rebuildConfig: {},
   makers: [

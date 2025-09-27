@@ -1145,15 +1145,17 @@ function registerIpcHandlers() {
 const createWindow = async () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1200,
+    height: 800,
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       webSecurity: false, // Permet l'accès aux fichiers locaux
       disableWebSecurity: true, // Désactive complètement la sécurité web
       nodeIntegration: false,
       contextIsolation: true,
+      devTools: false, // Désactiver les DevTools
     },
+    show: false, // Ne pas afficher immédiatement
   });
 
   // Désactiver complètement la CSP pour permettre les CDN externes
@@ -1168,11 +1170,36 @@ const createWindow = async () => {
     callback({ responseHeaders });
   });
 
+  // Désactiver le menu contextuel
+  mainWindow.webContents.on('context-menu', (e) => {
+    e.preventDefault();
+  });
+
+  // Désactiver les raccourcis de développement
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    // Désactiver F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+    if (input.key === 'F12' || 
+        (input.control && input.shift && (input.key === 'I' || input.key === 'J')) ||
+        (input.control && input.key === 'U')) {
+      event.preventDefault();
+    }
+  });
+
+  // Désactiver la console
+  mainWindow.webContents.on('console-message', (event) => {
+    event.preventDefault();
+  });
+
   // and load the index.html of the app.
   mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
-  // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  // Afficher la fenêtre une fois chargée
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+  });
+
+  // Empêcher l'ouverture des DevTools
+  mainWindow.webContents.setDevToolsWebContents(null);
 };
 
 // This method will be called when Electron has finished
