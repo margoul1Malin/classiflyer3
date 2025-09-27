@@ -321,7 +321,7 @@ function renderClasseurs(container, classeurs) {
     deleteItem.textContent = 'Supprimer';
     deleteItem.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm('Envoyer ce classeur à la corbeille ?')) {
+      if (await showConfirmModal('Confirmation', 'Envoyer ce classeur à la corbeille ?')) {
         try {
           await window.classiflyer.trashMoveClasseur(item.id, 'mes');
         await window.classiflyer.listClasseurs().then((l) => renderClasseurs(container, l));
@@ -709,7 +709,7 @@ async function handleFolderAction(action, folderId, folder) {
       openRenameFolderModal(folderId, folder.name);
       break;
     case 'delete':
-      if (confirm(`Supprimer le dossier "${folder.name}" et tout son contenu ?`)) {
+      if (await showConfirmModal('Confirmation', `Supprimer le dossier "${folder.name}" et tout son contenu ?`)) {
         try {
           await window.classiflyer.deleteFolder(currentClasseurId, folderId);
           await refreshClasseurView();
@@ -911,11 +911,10 @@ async function renderPDF(filePath, canvas, pdfNav) {
 
     // Créer un canvas pour le rendu
     const pdfCanvas = document.createElement('canvas');
-    pdfCanvas.style.maxWidth = '100%';
-    pdfCanvas.style.maxHeight = '100%';
     pdfCanvas.style.display = 'block';
     pdfCanvas.style.margin = '0 auto';
     pdfCanvas.style.border = '1px solid #ddd';
+    pdfCanvas.style.cursor = 'grab';
     canvas.appendChild(pdfCanvas);
 
     // Charger le document avec PDF.js
@@ -1022,6 +1021,7 @@ async function renderCurrentPdfPage(canvas, scale = 1.5) {
   const page = await pdfDoc.getPage(currentPdfPage);
   const viewport = page.getViewport({ scale: scale });
 
+  // Définir la taille du canvas selon le viewport
   canvas.width = viewport.width;
   canvas.height = viewport.height;
 
@@ -1032,6 +1032,10 @@ async function renderCurrentPdfPage(canvas, scale = 1.5) {
   };
 
   await page.render(renderContext).promise;
+  
+  // Mettre à jour le style du canvas pour le scroll
+  canvas.style.width = `${viewport.width}px`;
+  canvas.style.height = `${viewport.height}px`;
 }
 
 function updatePdfPageInfo() {
@@ -1514,6 +1518,53 @@ function initArchivesView() {
   }
 }
 
+// ===== MODAL DE CONFIRMATION =====
+function showConfirmModal(title, message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirm');
+    const titleEl = document.getElementById('confirm-title');
+    const messageEl = document.getElementById('confirm-message');
+    const cancelBtn = document.getElementById('confirm-cancel');
+    const okBtn = document.getElementById('confirm-ok');
+
+    if (!modal || !titleEl || !messageEl || !cancelBtn || !okBtn) {
+      resolve(false);
+      return;
+    }
+
+    titleEl.textContent = title;
+    messageEl.textContent = message;
+    modal.setAttribute('aria-hidden', 'false');
+
+    const cleanup = () => {
+      modal.setAttribute('aria-hidden', 'true');
+      cancelBtn.removeEventListener('click', handleCancel);
+      okBtn.removeEventListener('click', handleOk);
+      modal.removeEventListener('keydown', handleKeydown);
+    };
+
+    const handleCancel = () => {
+      cleanup();
+      resolve(false);
+    };
+
+    const handleOk = () => {
+      cleanup();
+      resolve(true);
+    };
+
+    const handleKeydown = (e) => {
+      if (e.key === 'Escape') {
+        handleCancel();
+      }
+    };
+
+    cancelBtn.addEventListener('click', handleCancel);
+    okBtn.addEventListener('click', handleOk);
+    modal.addEventListener('keydown', handleKeydown);
+  });
+}
+
 // ===== CORBEILLE =====
 function initTrashView() {
   const view = document.getElementById('view-corbeille');
@@ -1540,7 +1591,7 @@ function initTrashView() {
 
   if (clearBtn) {
     clearBtn.addEventListener('click', async () => {
-      if (confirm('Êtes-vous sûr de vouloir vider complètement la corbeille ? Cette action est irréversible et supprimera définitivement tous les classeurs et leur contenu.')) {
+      if (await showConfirmModal('Vider la corbeille', 'Êtes-vous sûr de vouloir vider complètement la corbeille ? Cette action est irréversible et supprimera définitivement tous les classeurs et leur contenu.')) {
         try {
           await window.classiflyer.trashClearAll();
           await refresh();
@@ -1635,7 +1686,7 @@ function renderTrash(container, items) {
     deleteItem.textContent = '🗑️ Supprimer définitivement';
     deleteItem.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (!confirm('Supprimer définitivement ? Cette action est irréversible.')) return;
+      if (!(await showConfirmModal('Suppression définitive', 'Supprimer définitivement ? Cette action est irréversible.'))) return;
       try {
         await window.classiflyer.trashDeleteClasseur(it.id);
         const list = await window.classiflyer.trashList();
@@ -2045,7 +2096,7 @@ function renderArchivedClasseurs(container, archives) {
     deleteItem.textContent = 'Supprimer';
     deleteItem.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm('Envoyer ce classeur à la corbeille ?')) {
+      if (await showConfirmModal('Confirmation', 'Envoyer ce classeur à la corbeille ?')) {
         try {
           await window.classiflyer.trashMoveClasseur(item.id, 'archives');
           // Recharger en préservant l'état du dossier sélectionné
@@ -2280,7 +2331,7 @@ async function renameArchiveFolder(folderId) {
 }
 
 async function deleteArchiveFolder(folderId) {
-  if (!confirm('Envoyer ce dossier et tous ses classeurs à la corbeille ?')) {
+  if (!(await showConfirmModal('Confirmation', 'Envoyer ce dossier et tous ses classeurs à la corbeille ?'))) {
     return;
   }
 
