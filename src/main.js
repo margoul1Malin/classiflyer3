@@ -156,10 +156,39 @@ function registerIpcHandlers() {
           };
         } else {
           const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+          
+          // Détecter le type MIME basé sur l'extension
+          const ext = path.extname(entry.name).toLowerCase();
+          let mimeType = 'application/octet-stream';
+          
+          if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.svg'].includes(ext)) {
+            if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+            else if (ext === '.png') mimeType = 'image/png';
+            else if (ext === '.gif') mimeType = 'image/gif';
+            else if (ext === '.webp') mimeType = 'image/webp';
+            else if (ext === '.avif') mimeType = 'image/avif';
+            else if (ext === '.bmp') mimeType = 'image/bmp';
+            else if (ext === '.svg') mimeType = 'image/svg+xml';
+          } else if (ext === '.pdf') {
+            mimeType = 'application/pdf';
+          } else if (['.xlsx', '.xls'].includes(ext)) {
+            mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          } else if (['.txt'].includes(ext)) {
+            mimeType = 'text/plain';
+          } else if (['.pp', '.ppt', '.pptx'].includes(ext)) {
+            mimeType = 'application/vnd.ms-powerpoint';
+          } else if (['.odt'].includes(ext)) {
+            mimeType = 'application/vnd.oasis.opendocument.text';
+          } else if (['.ods'].includes(ext)) {
+            mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
+          } else if (['.odp'].includes(ext)) {
+            mimeType = 'application/vnd.oasis.opendocument.presentation';
+          }
+          
           files[fileId] = {
             name: entry.name,
             sys_path: entryPath,
-            mime: null,
+            mime: mimeType,
             createdAt: Date.now()
           };
         }
@@ -361,8 +390,8 @@ function registerIpcHandlers() {
     return { id: idKey, ...item };
   });
 
-  ipcMain.handle('classeur:createFolder', async (_e, idKey, folderName) => {
-    console.log('classeur:createFolder called with:', { idKey, folderName });
+  ipcMain.handle('classeur:createFolder', async (_e, idKey, folderName, parentFolderId = null) => {
+    console.log('classeur:createFolder called with:', { idKey, folderName, parentFolderId });
     if (!folderName || !idKey) throw new Error('Paramètres manquants');
     const db = await readDb();
     
@@ -385,14 +414,58 @@ function registerIpcHandlers() {
     }
     
     const folderId = `dossier_${(db.nextId.dossiers = (db.nextId.dossiers || 1) + 1)}`;
-    const folderPath = path.join(cls.sys_path, folderName);
-    console.log('Création du dossier:', { folderPath });
+    
+    // Fonction récursive pour trouver le dossier parent et créer le sous-dossier
+    function findParentAndCreate(folders, parentId, folderName, newFolderId) {
+      for (const [currentId, folder] of Object.entries(folders)) {
+        if (currentId === parentId) {
+          // Trouvé le dossier parent, créer le sous-dossier ici
+          const folderPath = path.join(folder.sys_path, folderName);
+          console.log('Création du sous-dossier:', { folderPath });
+          return { folderPath, parentFolder: folder };
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const result = findParentAndCreate(folder.folders, parentId, folderName, newFolderId);
+          if (result) return result;
+        }
+      }
+      return null;
+    }
+    
+    let folderPath;
+    let parentFolder = null;
+    
+    if (parentFolderId && cls.folders) {
+      // Créer un sous-dossier
+      const result = findParentAndCreate(cls.folders, parentFolderId, folderName, folderId);
+      if (!result) throw new Error('Dossier parent introuvable');
+      folderPath = result.folderPath;
+      parentFolder = result.parentFolder;
+    } else {
+      // Créer à la racine du classeur
+      folderPath = path.join(cls.sys_path, folderName);
+      console.log('Création du dossier racine:', { folderPath });
+    }
+    
     await fsp.mkdir(folderPath, { recursive: true });
-    cls.folders = cls.folders || {};
-    cls.folders[folderId] = { name: folderName, sys_path: folderPath, files: {}, folders: {} };
+    
+    const newFolder = { name: folderName, sys_path: folderPath, files: {}, folders: {} };
+    
+    if (parentFolder) {
+      // Ajouter au dossier parent
+      parentFolder.folders = parentFolder.folders || {};
+      parentFolder.folders[folderId] = newFolder;
+    } else {
+      // Ajouter à la racine du classeur
+      cls.folders = cls.folders || {};
+      cls.folders[folderId] = newFolder;
+    }
+    
     cls.updatedAt = Date.now();
     await writeDb(db);
-    return { id: folderId, ...cls.folders[folderId] };
+    return { id: folderId, ...newFolder };
   });
 
   ipcMain.handle('classeur:uploadFiles', async (_e, idKey, targetFolderId, files) => {
@@ -410,7 +483,25 @@ function registerIpcHandlers() {
     
     if (!cls) throw new Error('Classeur introuvable');
     
-    const targetFolder = targetFolderId ? (cls.folders?.[targetFolderId]) : null;
+    // Fonction récursive pour trouver un dossier par son ID
+    function findFolderById(folders, folderId) {
+      if (!folders) return null;
+      
+      for (const [id, folder] of Object.entries(folders)) {
+        if (id === folderId) {
+          return folder;
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const found = findFolderById(folder.folders, folderId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    
+    const targetFolder = targetFolderId ? findFolderById(cls.folders, targetFolderId) : null;
     const destDir = targetFolder ? targetFolder.sys_path : cls.sys_path;
     await fsp.mkdir(destDir, { recursive: true });
     cls.files = cls.files || [];
@@ -419,7 +510,39 @@ function registerIpcHandlers() {
       const base = path.basename(f.path || f);
       const dest = path.join(destDir, base);
       await fsp.copyFile(f.path || f, dest);
-      const fileRec = { name: base, sys_path: dest, mime: f.mime || null, createdAt: Date.now() };
+      
+      // Détecter le type MIME basé sur l'extension si non fourni
+      let mimeType = f.mime || null;
+      if (!mimeType) {
+        const ext = path.extname(base).toLowerCase();
+        mimeType = 'application/octet-stream';
+        
+        if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.avif', '.bmp', '.svg'].includes(ext)) {
+          if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+          else if (ext === '.png') mimeType = 'image/png';
+          else if (ext === '.gif') mimeType = 'image/gif';
+          else if (ext === '.webp') mimeType = 'image/webp';
+          else if (ext === '.avif') mimeType = 'image/avif';
+          else if (ext === '.bmp') mimeType = 'image/bmp';
+          else if (ext === '.svg') mimeType = 'image/svg+xml';
+        } else if (ext === '.pdf') {
+          mimeType = 'application/pdf';
+        } else if (['.xlsx', '.xls'].includes(ext)) {
+          mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+        } else if (['.txt'].includes(ext)) {
+          mimeType = 'text/plain';
+        } else if (['.pp', '.ppt', '.pptx'].includes(ext)) {
+          mimeType = 'application/vnd.ms-powerpoint';
+        } else if (['.odt'].includes(ext)) {
+          mimeType = 'application/vnd.oasis.opendocument.text';
+        } else if (['.ods'].includes(ext)) {
+          mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
+        } else if (['.odp'].includes(ext)) {
+          mimeType = 'application/vnd.oasis.opendocument.presentation';
+        }
+      }
+      
+      const fileRec = { name: base, sys_path: dest, mime: mimeType, createdAt: Date.now() };
       if (targetFolder) {
         targetFolder.files = targetFolder.files || {};
         const fid = `file_${(db.nextId.fichiers = (db.nextId.fichiers || 1) + 1)}`;
@@ -450,7 +573,26 @@ function registerIpcHandlers() {
     }
     
     if (!cls) throw new Error('Classeur introuvable');
-    const folder = cls.folders?.[folderId];
+    
+    // Fonction récursive pour trouver un dossier par son ID
+    function findFolderById(folders, folderId) {
+      if (!folders) return null;
+      
+      for (const [id, folder] of Object.entries(folders)) {
+        if (id === folderId) {
+          return folder;
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const found = findFolderById(folder.folders, folderId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    
+    const folder = findFolderById(cls.folders, folderId);
     if (!folder) throw new Error('Dossier introuvable');
     
     if (updates.name && updates.name !== folder.name) {
@@ -514,14 +656,55 @@ function registerIpcHandlers() {
     }
     
     if (!cls) throw new Error('Classeur introuvable');
-    const folder = cls.folders?.[folderId];
+    
+    // Fonction récursive pour trouver et supprimer un dossier par son ID
+    function findAndDeleteFolder(folders, folderId) {
+      if (!folders) return false;
+      
+      for (const [id, folder] of Object.entries(folders)) {
+        if (id === folderId) {
+          // Trouvé le dossier, le supprimer
+          delete folders[id];
+          return true;
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const deleted = findAndDeleteFolder(folder.folders, folderId);
+          if (deleted) return true;
+        }
+      }
+      return false;
+    }
+    
+    // Fonction récursive pour trouver un dossier par son ID (pour obtenir le chemin)
+    function findFolderById(folders, folderId) {
+      if (!folders) return null;
+      
+      for (const [id, folder] of Object.entries(folders)) {
+        if (id === folderId) {
+          return folder;
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const found = findFolderById(folder.folders, folderId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    
+    const folder = findFolderById(cls.folders, folderId);
     if (!folder) throw new Error('Dossier introuvable');
     
     // Delete folder from filesystem
     await fsp.rm(folder.sys_path, { recursive: true, force: true });
     
-    // Remove from DB
-    delete cls.folders[folderId];
+    // Remove from DB recursively
+    const deleted = findAndDeleteFolder(cls.folders, folderId);
+    if (!deleted) throw new Error('Impossible de supprimer le dossier de la base de données');
+    
     cls.updatedAt = Date.now();
     await writeDb(db);
     return true;
@@ -1243,6 +1426,20 @@ ipcMain.handle('file:toDataUrl', async (_e, filePath) => {
       else if (ext === '.avif') mimeType = 'image/avif';
       else if (ext === '.bmp') mimeType = 'image/bmp';
       else if (ext === '.svg') mimeType = 'image/svg+xml';
+    } else if (ext === '.pdf') {
+      mimeType = 'application/pdf';
+    } else if (['.xlsx', '.xls'].includes(ext)) {
+      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    } else if (['.txt'].includes(ext)) {
+      mimeType = 'text/plain';
+    } else if (['.pp', '.ppt', '.pptx'].includes(ext)) {
+      mimeType = 'application/vnd.ms-powerpoint';
+    } else if (['.odt'].includes(ext)) {
+      mimeType = 'application/vnd.oasis.opendocument.text';
+    } else if (['.ods'].includes(ext)) {
+      mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
+    } else if (['.odp'].includes(ext)) {
+      mimeType = 'application/vnd.oasis.opendocument.presentation';
     }
     
     const base64 = data.toString('base64');

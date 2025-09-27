@@ -13,6 +13,7 @@
         <button class="nav-item" data-view="view-archives">Archives</button>
         <button class="nav-item" data-view="view-corbeille">Corbeille</button>
         <div class="nav-separator"></div>
+        <button class="nav-item" data-view="view-documentation">📚 Documentation</button>
         <button class="nav-item" data-view="view-parametres">Paramètres</button>
       </nav>
     </aside>
@@ -56,6 +57,7 @@
             <div id="viewer-canvas" class="viewer-canvas"></div>
           </div>
           <aside class="classeur-sidebar">
+            <div class="resize-handle"></div>
             <div class="sidebar-header">
               <input id="classeur-search" type="search" placeholder="Rechercher dans ce classeur…" />
               <div class="sidebar-actions">
@@ -97,6 +99,341 @@
           </div>
         </div>
         <div id="trash-list" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
+      </section>
+      <section id="view-documentation" class="view" role="region" aria-label="Documentation">
+        <div class="documentation-layout">
+          <!-- Sidebar interne de navigation -->
+          <aside class="documentation-sidebar">
+            <div class="doc-sidebar-header">
+              <h2>📚 Documentation</h2>
+              <p>Guide complet Classiflyer</p>
+            </div>
+            <nav class="doc-sidebar-nav">
+              <button class="doc-nav-item active" data-section="mes-classeurs">
+                <span class="doc-nav-icon">📁</span>
+                <span class="doc-nav-label">Mes Classeurs</span>
+              </button>
+              <button class="doc-nav-item" data-section="archives">
+                <span class="doc-nav-icon">📦</span>
+                <span class="doc-nav-label">Archives</span>
+              </button>
+              <button class="doc-nav-item" data-section="corbeille">
+                <span class="doc-nav-icon">🗑️</span>
+                <span class="doc-nav-label">Corbeille</span>
+              </button>
+              <button class="doc-nav-item" data-section="parametres">
+                <span class="doc-nav-icon">⚙️</span>
+                <span class="doc-nav-label">Paramètres</span>
+              </button>
+            </nav>
+          </aside>
+
+          <!-- Contenu principal avec scroll -->
+          <main class="documentation-main">
+            <div class="documentation-content">
+            <!-- Section Mes Classeurs -->
+            <div id="doc-mes-classeurs" class="doc-section active">
+              <h2>📁 Mes Classeurs</h2>
+              <p>Votre espace de travail principal pour organiser, consulter et gérer tous vos documents de manière structurée et intuitive.</p>
+              
+              <div class="doc-feature">
+                <h3>🎯 Vue d'ensemble</h3>
+                <ul>
+                  <li><strong>Organisation complète</strong> : Créez et gérez vos classeurs de documents avec une structure illimitée</li>
+                  <li><strong>Consultation avancée</strong> : Visualisez tous types de fichiers directement dans l'application</li>
+                  <li><strong>Navigation fluide</strong> : Parcourez vos documents avec des outils de navigation intuitifs</li>
+                  <li><strong>Recherche intelligente</strong> : Trouvez rapidement vos classeurs parmi tous vos documents</li>
+                  <li><strong>Gestion flexible</strong> : Modifiez, archivez ou supprimez selon vos besoins</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>➕ Création de classeurs</h3>
+                <p>Deux méthodes pour créer un nouveau classeur :</p>
+                <ul>
+                  <li><strong>Classeur vide</strong> : Créez un classeur vierge que vous remplirez progressivement</li>
+                  <li><strong>Depuis un dossier existant</strong> : Transformez un dossier de votre ordinateur en classeur Classiflyer</li>
+                </ul>
+                <div class="doc-code">
+                  <pre>1. Cliquez sur "Nouveau classeur"
+2. Choisissez "Classeur vide" ou "Depuis un dossier"
+3. Si depuis un dossier : sélectionnez le dossier sur votre ordinateur
+4. Donnez un nom à votre classeur
+5. Validez la création</pre>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🔍 Recherche de classeurs</h3>
+                <p>Trouvez rapidement vos classeurs parmi tous vos documents :</p>
+                <ul>
+                  <li><strong>Recherche par nom</strong> : Tapez le nom ou une partie du nom du classeur</li>
+                  <li><strong>Filtrage instantané</strong> : Les résultats s'affichent en temps réel</li>
+                  <li><strong>Recherche globale</strong> : Recherchez dans tous vos classeurs simultanément</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>📖 Visualisation des documents</h3>
+                <p>L'application supporte la visualisation directe de nombreux formats :</p>
+                <div class="doc-actions">
+                  <div class="action-item">
+                    <span class="action-icon">📄</span>
+                    <div><strong>Documents PDF</strong><br>Navigation entre les pages, zoom, défilement</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">🖼️</span>
+                    <div><strong>Images</strong><br>JPEG, PNG, GIF, SVG avec zoom et contrôles</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">📊</span>
+                    <div><strong>Tableaux Excel</strong><br>Feuilles de calcul complètes</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">📝</span>
+                    <div><strong>Documents OpenOffice</strong><br>Textes, tableaux, présentations</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">📋</span>
+                    <div><strong>Fichiers texte</strong><br>Contenu brut et formaté</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🎮 Contrôles de navigation</h3>
+                <p>Naviguez facilement dans vos documents :</p>
+                <ul>
+                  <li><strong>Flèches de navigation</strong> : Utilisez les flèches ← → pour passer d'un onglet à l'autre</li>
+                  <li><strong>Navigation dans les PDF</strong> : Parcourez les pages d'un document PDF multi-pages</li>
+                  <li><strong>Zoom sur les images</strong> : Agrandissez ou réduisez les images pour une meilleure lecture</li>
+                  <li><strong>Défilement</strong> : Faites défiler les documents longs verticalement</li>
+                  <li><strong>Glisser-déposer</strong> : Déplacez facilement les fichiers entre les dossiers</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>📁 Gestion des dossiers et fichiers</h3>
+                <p>Organisez vos documents de manière illimitée :</p>
+                <ul>
+                  <li><strong>Dossiers imbriqués</strong> : Créez des sous-dossiers à l'infini</li>
+                  <li><strong>Icône de création</strong> : Passez la souris sur un dossier pour voir l'icône "+" de création de sous-dossier</li>
+                  <li><strong>Upload multiple</strong> : Téléchargez plusieurs fichiers simultanément</li>
+                  <li><strong>Renommage</strong> : Renommez fichiers et dossiers en un clic</li>
+                  <li><strong>Suppression sélective</strong> : Supprimez des éléments individuellement</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>📋 Actions disponibles sur les classeurs</h3>
+                <div class="doc-actions">
+                  <div class="action-item">
+                    <span class="action-icon">👁️</span>
+                    <div><strong>Ouvrir</strong><br>Accéder au contenu complet du classeur</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">✏️</span>
+                    <div><strong>Renommer</strong><br>Modifier le nom du classeur</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">📦</span>
+                    <div><strong>Archiver</strong><br>Déplacer vers les archives pour le ranger</div>
+                  </div>
+                  <div class="action-item">
+                    <span class="action-icon">🗑️</span>
+                    <div><strong>Supprimer</strong><br>Déplacer vers la corbeille</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🔄 Flux de travail complet</h3>
+                <div class="doc-flow">
+                  <div class="flow-step">
+                    <div class="flow-number">1</div>
+                    <div class="flow-content">
+                      <strong>Créer votre classeur</strong>
+                      <p>Classeur vide ou depuis un dossier existant</p>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">
+                    <div class="flow-number">2</div>
+                    <div class="flow-content">
+                      <strong>Organiser vos documents</strong>
+                      <p>Créez des dossiers et ajoutez vos fichiers</p>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">
+                    <div class="flow-number">3</div>
+                    <div class="flow-content">
+                      <strong>Consulter et naviguer</strong>
+                      <p>Utilisez les contrôles pour parcourir vos documents</p>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">
+                    <div class="flow-number">4</div>
+                    <div class="flow-content">
+                      <strong>Maintenir et organiser</strong>
+                      <p>Modifiez, archivez ou supprimez selon vos besoins</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>💡 Conseils d'utilisation</h3>
+                <ul>
+                  <li><strong>Nommage</strong> : Utilisez des noms clairs et descriptifs pour vos classeurs</li>
+                  <li><strong>Structure</strong> : Organisez vos dossiers de manière logique et hiérarchique</li>
+                  <li><strong>Navigation</strong> : Utilisez les flèches pour passer rapidement d'un document à l'autre</li>
+                  <li><strong>Zoom</strong> : Ajustez le zoom sur les images et PDF pour une lecture optimale</li>
+                  <li><strong>Sauvegarde</strong> : Vos modifications sont automatiquement sauvegardées</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Section Archives -->
+            <div id="doc-archives" class="doc-section">
+              <h2>📦 Archives</h2>
+              <p>Conservez vos anciens projets de manière organisée.</p>
+              
+              <div class="doc-feature">
+                <h3>🎯 Fonctionnalités principales</h3>
+                <ul>
+                  <li><strong>Stockage long terme</strong> : Gardez vos projets terminés</li>
+                  <li><strong>Organisation par dossiers</strong> : Structure hiérarchique des archives</li>
+                  <li><strong>Restauration</strong> : Remettre un classeur en activité</li>
+                  <li><strong>Recherche</strong> : Trouvez vos anciens projets</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🔄 Cycle de vie des documents</h3>
+                <div class="doc-flow">
+                  <div class="flow-step">
+                    <span class="flow-number">1</span>
+                    <div class="flow-content">
+                      <strong>Mes Classeurs</strong>
+                      <p>Projets actifs en cours</p>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">
+                    <span class="flow-number">2</span>
+                    <div class="flow-content">
+                      <strong>Archives</strong>
+                      <p>Projets terminés conservés</p>
+                    </div>
+                  </div>
+                  <div class="flow-arrow">→</div>
+                  <div class="flow-step">
+                    <span class="flow-number">3</span>
+                    <div class="flow-content">
+                      <strong>Corbeille</strong>
+                      <p>Éléments supprimés</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>📁 Organisation des archives</h3>
+                <ul>
+                  <li><strong>Dossiers d'archives</strong> : Créez des catégories (Ex: "2024", "Projets terminés")</li>
+                  <li><strong>Structure préservée</strong> : Tous les sous-dossiers et fichiers restent intacts</li>
+                  <li><strong>Chemins mis à jour</strong> : La base de données est automatiquement synchronisée</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Section Corbeille -->
+            <div id="doc-corbeille" class="doc-section">
+              <h2>🗑️ Corbeille</h2>
+              <p>Système de sécurité pour récupérer les éléments supprimés par erreur.</p>
+              
+              <div class="doc-feature">
+                <h3>🛡️ Sécurité des données</h3>
+                <ul>
+                  <li><strong>Suppression temporaire</strong> : Les éléments ne sont pas définitivement perdus</li>
+                  <li><strong>Anciens chemins sauvegardés</strong> : Possibilité de restauration complète</li>
+                  <li><strong>Récursivité préservée</strong> : Toute la structure des dossiers est conservée</li>
+                  <li><strong>Double protection</strong> : Depuis "Mes Classeurs" ou "Archives"</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🔄 Processus de suppression</h3>
+                <ol>
+                  <li><strong>Déplacement physique</strong> : Le dossier est déplacé vers le dossier corbeille</li>
+                  <li><strong>Sauvegarde des chemins</strong> : <code>old_sys_path</code> est enregistré pour chaque fichier/dossier</li>
+                  <li><strong>Mise à jour de la DB</strong> : Les nouveaux chemins sont mis à jour</li>
+                  <li><strong>Marquage temporel</strong> : Date de suppression enregistrée</li>
+                </ol>
+              </div>
+
+              <div class="doc-feature">
+                <h3>♻️ Restauration</h3>
+                <ul>
+                  <li><strong>Restauration complète</strong> : Remet le classeur exactement comme avant</li>
+                  <li><strong>Chemins restaurés</strong> : Utilise les <code>old_sys_path</code> sauvegardés</li>
+                  <li><strong>Structure préservée</strong> : Tous les sous-dossiers et fichiers retrouvent leur place</li>
+                  <li><strong>Nettoyage automatique</strong> : Les anciens chemins temporaires sont supprimés</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>⚠️ Suppression définitive</h3>
+                <p>La suppression définitive efface complètement les fichiers du disque. Cette action est irréversible.</p>
+              </div>
+            </div>
+
+            <!-- Section Paramètres -->
+            <div id="doc-parametres" class="doc-section">
+              <h2>⚙️ Paramètres</h2>
+              <p>Configuration centrale de Classiflyer.</p>
+              
+              <div class="doc-feature">
+                <h3>📂 RootPath</h3>
+                <p>Le <strong>RootPath</strong> est le dossier principal où Classiflyer stocke tous ses fichiers :</p>
+                <ul>
+                  <li><strong>classeurs/</strong> : Vos classeurs actifs</li>
+                  <li><strong>archives/</strong> : Les projets archivés</li>
+                  <li><strong>corbeille/</strong> : Les éléments supprimés</li>
+                  <li><strong>db.json</strong> : Base de données de l'application</li>
+                </ul>
+              </div>
+
+              <div class="doc-feature">
+                <h3>💾 Structure recommandée</h3>
+                <div class="doc-code">
+<pre>~/.classiflyer/config/          (Linux/Mac)
+C:\Users\[user]\AppData\Roaming\Classiflyer\config\  (Windows)
+├── db.json
+├── classeurs/
+│   ├── Projet 2025/
+│   └── Factures/
+├── archives/
+│   ├── 2024/
+│   └── Projets terminés/
+└── corbeille/</pre>
+                </div>
+              </div>
+
+              <div class="doc-feature">
+                <h3>🔧 Configuration</h3>
+                <ul>
+                  <li><strong>Chemin personnalisé</strong> : Choisissez où stocker vos données</li>
+                  <li><strong>Portabilité</strong> : Déplacez facilement votre configuration</li>
+                  <li><strong>Sauvegarde</strong> : Sauvegardez le dossier entier pour une sauvegarde complète</li>
+                </ul>
+              </div>
+            </div>
+            </div>
+          </main>
+        </div>
       </section>
       <section id="view-parametres" class="view" role="region" aria-label="Paramètres">
         <h1>Paramètres</h1>

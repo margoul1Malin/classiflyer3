@@ -24,7 +24,7 @@ contextBridge.exposeInMainWorld('classiflyer', {
   archiveClasseur: async (id, archiveFolderId = null) => ipcRenderer.invoke('classeurs:archive', id, archiveFolderId),
   // Classeur FS ops
   getClasseur: async (id) => ipcRenderer.invoke('classeur:get', id),
-  createFolder: async (id, name) => ipcRenderer.invoke('classeur:createFolder', id, name),
+  createFolder: async (id, name, parentFolderId = null) => ipcRenderer.invoke('classeur:createFolder', id, name, parentFolderId),
   uploadFiles: async (id, folderId, files) => ipcRenderer.invoke('classeur:uploadFiles', id, folderId, files),
   updateFolder: async (id, folderId, updates) => ipcRenderer.invoke('classeur:updateFolder', id, folderId, updates),
   deleteFolder: async (id, folderId) => ipcRenderer.invoke('classeur:deleteFolder', id, folderId),

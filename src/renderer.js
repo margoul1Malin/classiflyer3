@@ -50,6 +50,29 @@ function updateActiveNav(targetButton) {
   }
 }
 
+function setupDocumentationNavigation() {
+  const docNavItems = document.querySelectorAll('.doc-nav-item');
+  
+  docNavItems.forEach(item => {
+    item.addEventListener('click', () => {
+      const section = item.getAttribute('data-section');
+      
+      // Mettre à jour l'état actif des boutons de navigation
+      docNavItems.forEach(navItem => navItem.classList.remove('active'));
+      item.classList.add('active');
+      
+      // Afficher la section correspondante
+      const sections = document.querySelectorAll('.doc-section');
+      sections.forEach(sec => sec.classList.remove('active'));
+      
+      const targetSection = document.getElementById(`doc-${section}`);
+      if (targetSection) {
+        targetSection.classList.add('active');
+      }
+    });
+  });
+}
+
 function setupNavigation() {
   const nav = document.querySelector('.nav');
   if (!nav) return;
@@ -62,6 +85,11 @@ function setupNavigation() {
     selectView(viewId);
     updateActiveNav(target);
     history.replaceState({}, '', `#${viewId}`);
+    
+    // Initialiser la navigation de la documentation si nécessaire
+    if (viewId === 'view-documentation') {
+      setupDocumentationNavigation();
+    }
   });
 }
 
@@ -489,6 +517,7 @@ async function openClasseurView(id, origin = 'mes-classeurs') {
   }
   setupViewerNav();
   setupClasseurActions();
+  setupSidebarResize();
 }
 
 function updateBackButton() {
@@ -512,20 +541,38 @@ function updateBackButton() {
 
 function collectAllFiles(classeur) {
   const files = [];
-  // root files array (if any)
-  if (Array.isArray(classeur.files)) {
-    for (const f of classeur.files) files.push(f);
-  }
-  // folders first-level only for now
-  if (classeur.folders) {
-    for (const [fid, folder] of Object.entries(classeur.folders)) {
-      if (folder.files) {
-        for (const [id, f] of Object.entries(folder.files)) {
-          files.push({ ...f, id });
-        }
+  
+  // Fonction récursive pour parcourir tous les dossiers
+  function collectFromFolder(folder, depth = 0) {
+    // Ajouter les fichiers du dossier actuel
+    if (folder.files) {
+      for (const [id, f] of Object.entries(folder.files)) {
+        files.push({ ...f, id, depth });
+      }
+    }
+    
+    // Parcourir récursivement les sous-dossiers
+    if (folder.folders) {
+      for (const [subFolderId, subFolder] of Object.entries(folder.folders)) {
+        collectFromFolder(subFolder, depth + 1);
       }
     }
   }
+  
+  // root files array (if any)
+  if (Array.isArray(classeur.files)) {
+    for (const f of classeur.files) {
+      files.push({ ...f, depth: 0 });
+    }
+  }
+  
+  // Parcourir tous les dossiers récursivement
+  if (classeur.folders) {
+    for (const [fid, folder] of Object.entries(classeur.folders)) {
+      collectFromFolder(folder, 1);
+    }
+  }
+  
   return files;
 }
 
@@ -538,6 +585,66 @@ function renderClasseurTree(classeur) {
   rootLabel.className = 'node is-selected';
   rootLabel.textContent = classeur.name || 'Classeur';
   tree.appendChild(rootLabel);
+
+  // Fonction récursive pour rendre un dossier et ses sous-dossiers
+  function renderFolder(folder, folderId, depth = 1) {
+    const folderContainer = document.createElement('div');
+    folderContainer.className = 'folder-container';
+    
+             const folderNode = document.createElement('div');
+             folderNode.className = 'node folder-node';
+             folderNode.style.paddingLeft = `${20 + (depth * 20)}px`;
+             folderNode.innerHTML = `
+               <span>📁 ${folder.name}</span>
+               <div class="folder-actions">
+                 <button class="btn-icon" title="Nouveau sous-dossier" data-action="create-subfolder" data-folder-id="${folderId}">📁+</button>
+                 <button class="btn-icon" title="Uploader fichier" data-action="upload" data-folder-id="${folderId}">+</button>
+                 <button class="btn-icon" title="Modifier" data-action="edit" data-folder-id="${folderId}">⋯</button>
+                 <button class="btn-icon" title="Supprimer" data-action="delete" data-folder-id="${folderId}">🗑</button>
+               </div>
+             `;
+    
+    // Handle folder actions
+    folderNode.addEventListener('click', (e) => {
+      if (e.target.matches('[data-action]')) {
+        e.stopPropagation();
+        const action = e.target.getAttribute('data-action');
+        const folderId = e.target.getAttribute('data-folder-id');
+        handleFolderAction(action, folderId, folder);
+      }
+    });
+    
+    folderContainer.appendChild(folderNode);
+
+    // Ajouter les fichiers de ce dossier
+    if (folder.files) {
+      for (const [fileId, f] of Object.entries(folder.files)) {
+        const fnode = document.createElement('div');
+        fnode.className = 'node';
+        fnode.style.paddingLeft = `${20 + ((depth + 1) * 20)}px`;
+        fnode.textContent = `📄 ${f.name}`;
+        fnode.addEventListener('click', async () => {
+          const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
+          if (idx >= 0) {
+            currentFileIndex = idx;
+            await renderViewer(currentFileList[currentFileIndex]);
+            highlightSelected(tree, f.sys_path);
+          }
+        });
+        folderContainer.appendChild(fnode);
+      }
+    }
+
+    // Récursivement rendre les sous-dossiers
+    if (folder.folders) {
+      for (const [subFolderId, subFolder] of Object.entries(folder.folders)) {
+        const subFolderContainer = renderFolder(subFolder, subFolderId, depth + 1);
+        folderContainer.appendChild(subFolderContainer);
+      }
+    }
+
+    return folderContainer;
+  }
 
   // Root files
   if (Array.isArray(classeur.files)) {
@@ -558,52 +665,11 @@ function renderClasseurTree(classeur) {
     }
   }
 
+  // Rendre tous les dossiers récursivement
   if (classeur.folders) {
     for (const [folderId, folder] of Object.entries(classeur.folders)) {
-      const folderContainer = document.createElement('div');
-      folderContainer.className = 'folder-container';
-      
-      const folderNode = document.createElement('div');
-      folderNode.className = 'node folder-node';
-      folderNode.innerHTML = `
-        <span>📁 ${folder.name}</span>
-        <div class="folder-actions">
-          <button class="btn-icon" title="Uploader fichier" data-action="upload" data-folder-id="${folderId}">+</button>
-          <button class="btn-icon" title="Modifier" data-action="edit" data-folder-id="${folderId}">⋯</button>
-          <button class="btn-icon" title="Supprimer" data-action="delete" data-folder-id="${folderId}">🗑</button>
-        </div>
-      `;
-      
-      // Handle folder actions
-      folderNode.addEventListener('click', (e) => {
-        if (e.target.matches('[data-action]')) {
-          e.stopPropagation();
-          const action = e.target.getAttribute('data-action');
-          const folderId = e.target.getAttribute('data-folder-id');
-          handleFolderAction(action, folderId, folder);
-        }
-      });
-      
-      folderContainer.appendChild(folderNode);
+      const folderContainer = renderFolder(folder, folderId);
       tree.appendChild(folderContainer);
-
-      if (folder.files) {
-        for (const [fileId, f] of Object.entries(folder.files)) {
-          const fnode = document.createElement('div');
-          fnode.className = 'node';
-          fnode.style.paddingLeft = '22px';
-          fnode.textContent = `📄 ${f.name}`;
-          fnode.addEventListener('click', async () => {
-            const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
-            if (idx >= 0) {
-              currentFileIndex = idx;
-              await renderViewer(currentFileList[currentFileIndex]);
-              highlightSelected(tree, f.sys_path);
-            }
-          });
-          folderContainer.appendChild(fnode);
-        }
-      }
     }
   }
 }
@@ -702,6 +768,9 @@ async function refreshClasseurView() {
 
 async function handleFolderAction(action, folderId, folder) {
   switch (action) {
+    case 'create-subfolder':
+      openCreateSubfolderModal(folderId, folder.name);
+      break;
     case 'upload':
       await uploadFilesToFolder(folderId);
       break;
@@ -749,6 +818,46 @@ function openRenameFolderModal(folderId, currentName) {
   }, { once: true });
 }
 
+function openCreateSubfolderModal(parentFolderId, parentFolderName) {
+  const modal = document.getElementById('modal-create-folder');
+  if (!modal) return;
+  modal.setAttribute('aria-hidden', 'false');
+
+  const nameInput = document.getElementById('folder-name');
+  const confirmBtn = document.getElementById('confirm-create-folder');
+  const closeEls = modal.querySelectorAll('[data-modal-close]');
+
+  if (nameInput instanceof HTMLInputElement) nameInput.value = '';
+  
+  // Modifier le titre pour indiquer qu'on crée un sous-dossier
+  const modalTitle = modal.querySelector('.modal-header h2');
+  if (modalTitle) modalTitle.textContent = `Créer un sous-dossier dans "${parentFolderName}"`;
+
+  const close = () => {
+    modal.setAttribute('aria-hidden', 'true');
+    // Restaurer le titre original
+    if (modalTitle) modalTitle.textContent = 'Créer un dossier';
+  };
+  closeEls.forEach((el) => el.addEventListener('click', close, { once: true }));
+  modal.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { once: true });
+
+  confirmBtn.addEventListener('click', async () => {
+    const folderName = (nameInput instanceof HTMLInputElement ? nameInput.value.trim() : '');
+    if (!folderName || !currentClasseurId) return;
+    try {
+      await window.classiflyer.createFolder(currentClasseurId, folderName, parentFolderId);
+      // Refresh the classeur view
+      const data = await window.classiflyer.getClasseur(currentClasseurId);
+      renderClasseurTree(data);
+      const allFiles = collectAllFiles(data);
+      currentFileList = allFiles;
+      close();
+    } catch (e) {
+      alert('Erreur lors de la création du sous-dossier: ' + e.message);
+    }
+  }, { once: true });
+}
+
 // PDF viewer state
 let pdfDoc = null;
 let currentPdfPage = 1;
@@ -780,6 +889,11 @@ async function renderViewer(file) {
   const isImageByExt = /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/.test(lowerPath);
   const isPdfByExt = /\.pdf$/.test(lowerPath);
   const isExcelByExt = /\.(xlsx?|xls)$/.test(lowerPath);
+  const isTxtByExt = /\.txt$/.test(lowerPath);
+  const isPpByExt = /\.pp$/.test(lowerPath);
+  const isOdtByExt = /\.odt$/.test(lowerPath);
+  const isOdsByExt = /\.ods$/.test(lowerPath);
+  const isOdpByExt = /\.odp$/.test(lowerPath);
   
   if (mime.startsWith('image/') || isImageByExt) {
     await renderImage(filePath, canvas);
@@ -787,6 +901,16 @@ async function renderViewer(file) {
     await renderPDF(filePath, canvas, pdfNav);
   } else if (mime.includes('excel') || isExcelByExt || mime.includes('spreadsheet')) {
     await renderExcel(filePath, canvas);
+  } else if (mime === 'text/plain' || isTxtByExt) {
+    await renderText(filePath, canvas);
+  } else if (mime.includes('powerpoint') || isPpByExt) {
+    await renderPowerPoint(filePath, canvas);
+  } else if (mime.includes('opendocument.text') || isOdtByExt) {
+    await renderOpenDocument(filePath, canvas, 'text');
+  } else if (mime.includes('opendocument.spreadsheet') || isOdsByExt) {
+    await renderOpenDocument(filePath, canvas, 'spreadsheet');
+  } else if (mime.includes('opendocument.presentation') || isOdpByExt) {
+    await renderOpenDocument(filePath, canvas, 'presentation');
   } else {
     const hint = document.createElement('div');
     hint.textContent = 'Aperçu non supporté. Télécharger / ouvrir avec application externe.';
@@ -796,14 +920,49 @@ async function renderViewer(file) {
 
 async function renderImage(filePath, canvas) {
   try {
-    const img = document.createElement('img');
+    const lowerPath = filePath.toLowerCase();
+    const isSvg = lowerPath.endsWith('.svg');
+    
+    if (isSvg) {
+      // Pour les SVG, charger directement le contenu et l'insérer dans un div
+      const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
+      const base64Data = dataUrl.split(',')[1];
+      const svgContent = atob(base64Data);
+      
+      const svgContainer = document.createElement('div');
+      svgContainer.style.cssText = `
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: auto;
+      `;
+      svgContainer.innerHTML = svgContent;
+      
+      // S'assurer que le SVG s'adapte bien
+      const svgElement = svgContainer.querySelector('svg');
+      if (svgElement) {
+        svgElement.style.maxWidth = '100%';
+        svgElement.style.maxHeight = '100%';
+        svgElement.style.width = 'auto';
+        svgElement.style.height = 'auto';
+      }
+      
+      canvas.appendChild(svgContainer);
+      highlightCurrentFile(filePath);
+      return;
+    }
+    
+    // Pour les autres images, utiliser img normalement
     const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
-    img.src = dataUrl;
-    img.style.maxWidth = '100%';
-    img.style.maxHeight = '100%';
-    img.style.objectFit = 'contain';
-    img.style.transition = 'transform 0.2s ease';
-    img.style.cursor = 'grab';
+    const displayElement = document.createElement('img');
+    displayElement.src = dataUrl;
+    displayElement.style.maxWidth = '100%';
+    displayElement.style.maxHeight = '100%';
+    displayElement.style.objectFit = 'contain';
+    displayElement.style.transition = 'transform 0.2s ease';
+    displayElement.style.cursor = 'grab';
     
     let currentZoom = 1;
     let translateX = 0;
@@ -813,7 +972,7 @@ async function renderImage(filePath, canvas) {
     
     // Fonction pour mettre à jour le zoom et la position
     const updateTransform = () => {
-      img.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
+      displayElement.style.transform = `translate(${translateX}px, ${translateY}px) scale(${currentZoom})`;
       document.getElementById('zoom-level').textContent = `${Math.round(currentZoom * 100)}%`;
     };
     
@@ -845,13 +1004,13 @@ async function renderImage(filePath, canvas) {
       updateTransform();
     };
     
-    // Gestion du drag & drop
-    img.addEventListener('mousedown', (e) => {
+    // Gestion du drag & drop pour les images normales
+    displayElement.addEventListener('mousedown', (e) => {
       isDragging = true;
       startX = e.clientX - translateX;
       startY = e.clientY - translateY;
-      img.style.cursor = 'grabbing';
-      img.style.transition = 'none'; // Désactiver la transition pendant le drag
+      displayElement.style.cursor = 'grabbing';
+      displayElement.style.transition = 'none'; // Désactiver la transition pendant le drag
     });
     
     document.addEventListener('mousemove', (e) => {
@@ -865,19 +1024,19 @@ async function renderImage(filePath, canvas) {
     document.addEventListener('mouseup', () => {
       if (isDragging) {
         isDragging = false;
-        img.style.cursor = 'grab';
-        img.style.transition = 'transform 0.2s ease'; // Remettre la transition
+        displayElement.style.cursor = 'grab';
+        displayElement.style.transition = 'transform 0.2s ease'; // Remettre la transition
       }
     });
     
-    // Zoom avec la molette (optionnel)
+    // Zoom avec la molette
     canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? 0.9 : 1.1;
       updateZoom(Math.min(Math.max(currentZoom * delta, 0.2), 5));
     });
     
-    canvas.appendChild(img);
+    canvas.appendChild(displayElement);
     
     // Initialiser l'affichage du zoom
     updateZoom(1);
@@ -890,6 +1049,1208 @@ async function renderImage(filePath, canvas) {
     const hint = document.createElement('div');
     hint.textContent = 'Erreur lors du chargement de l\'image.';
     canvas.appendChild(hint);
+  }
+}
+
+async function renderText(filePath, canvas) {
+  try {
+    // Créer un conteneur pour le texte
+    const textContainer = document.createElement('div');
+    textContainer.style.cssText = `
+      width: 100%;
+      height: 100%;
+      padding: 20px;
+      overflow: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    `;
+    
+    // Lire le contenu du fichier
+    const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
+    
+    // Extraire le contenu base64 du data URL
+    const base64Data = dataUrl.split(',')[1];
+    
+    // Décoder le base64 en texte
+    const textContent = atob(base64Data);
+    
+    // Afficher le contenu
+    textContainer.textContent = textContent;
+    
+    canvas.appendChild(textContainer);
+    
+    // Mettre en surbrillance le fichier actuel dans la sidebar
+    highlightCurrentFile(filePath);
+    
+  } catch (error) {
+    console.error('Erreur lors du chargement du fichier texte:', error);
+    const hint = document.createElement('div');
+    hint.textContent = 'Erreur lors du chargement du fichier texte.';
+    canvas.appendChild(hint);
+  }
+}
+
+async function renderPowerPoint(filePath, canvas) {
+  try {
+    const fileName = filePath.split(/[\\/]/).pop();
+    const isOldFormat = fileName.toLowerCase().endsWith('.pp');
+    
+    // Créer un conteneur pour la présentation PowerPoint
+    const ppContainer = document.createElement('div');
+    ppContainer.style.cssText = `
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    `;
+    
+    // Header avec contrôles
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: #d32f2f;
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+    `;
+    
+    const title = document.createElement('div');
+    title.textContent = isOldFormat ? '📊 PowerPoint 95/97 (.pp)' : '📊 Présentation PowerPoint';
+    
+    const controls = document.createElement('div');
+    controls.style.cssText = `
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    `;
+    
+    const slideCounter = document.createElement('div');
+    slideCounter.id = 'slide-counter';
+    slideCounter.style.cssText = `
+      background: rgba(255,255,255,0.2);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+    `;
+    
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = '← Préc.';
+    prevBtn.style.cssText = `
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    `;
+    
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Suiv. →';
+    nextBtn.style.cssText = `
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    `;
+    
+    controls.appendChild(slideCounter);
+    controls.appendChild(prevBtn);
+    controls.appendChild(nextBtn);
+    header.appendChild(title);
+    header.appendChild(controls);
+    
+    // Zone de contenu des slides
+    const slideArea = document.createElement('div');
+    slideArea.style.cssText = `
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    // Loading
+    const loading = document.createElement('div');
+    loading.textContent = '⏳ Chargement de la présentation...';
+    loading.style.cssText = `
+      font-size: 16px;
+      color: #666;
+    `;
+    slideArea.appendChild(loading);
+    
+    ppContainer.appendChild(header);
+    ppContainer.appendChild(slideArea);
+    canvas.appendChild(ppContainer);
+    
+    // Gestion spéciale pour les anciens fichiers .pp
+    if (isOldFormat) {
+      slideArea.innerHTML = `
+        <div style="text-align: center; color: #d32f2f;">
+          <div style="font-size: 64px; margin-bottom: 20px;">📊</div>
+          <h2 style="color: #d32f2f; margin-bottom: 16px;">PowerPoint 95/97 (.pp)</h2>
+          <p style="font-size: 16px; margin-bottom: 24px; max-width: 600px; line-height: 1.6;">
+            Ce fichier utilise l'ancien format PowerPoint 95/97 (.pp) qui est un format binaire fermé. 
+            Contrairement aux fichiers .pptx modernes, ce format ne peut pas être lu directement par le navigateur.
+          </p>
+          <div style="
+            background: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 20px 0;
+            border-left: 4px solid #d32f2f;
+            text-align: left;
+            max-width: 500px;
+          ">
+            <h3 style="margin: 0 0 12px 0; color: #d32f2f;">📄 Informations du fichier :</h3>
+            <div style="margin-bottom: 8px;"><strong>Nom :</strong> ${fileName}</div>
+            <div style="margin-bottom: 8px;"><strong>Taille :</strong> ${await getFileSize(filePath)}</div>
+            <div style="margin-bottom: 8px;"><strong>Format :</strong> PowerPoint 95/97</div>
+            <div><strong>Chemin :</strong> <span style="font-family: monospace; background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">${filePath}</span></div>
+          </div>
+          <div style="
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 20px 0;
+            max-width: 600px;
+          ">
+            <h4 style="margin: 0 0 8px 0; color: #856404;">💡 Solutions recommandées :</h4>
+            <ul style="text-align: left; margin: 0; padding-left: 20px; color: #856404;">
+              <li>Ouvrir avec Microsoft PowerPoint et sauvegarder au format .pptx moderne</li>
+              <li>Utiliser LibreOffice Impress pour convertir le fichier</li>
+              <li>Utiliser des outils de conversion en ligne</li>
+            </ul>
+          </div>
+          <button onclick="alert('Fichier ${fileName} - Format PowerPoint 95/97 non supporté pour la visualisation directe')" style="
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 16px;
+          ">
+            📁 Ouvrir avec application externe
+          </button>
+        </div>
+      `;
+      
+      // Mettre en surbrillance le fichier actuel dans la sidebar
+      highlightCurrentFile(filePath);
+      return;
+    }
+    
+    // Message simple pour PowerPoint - besoin d'app externe
+    slideArea.innerHTML = `
+      <div style="text-align: center; color: #d32f2f;">
+        <div style="font-size: 64px; margin-bottom: 20px;">📊</div>
+        <h2 style="color: #d32f2f; margin-bottom: 16px;">Présentation PowerPoint</h2>
+        <p style="font-size: 16px; margin-bottom: 24px; max-width: 600px; line-height: 1.6;">
+          Ce fichier PowerPoint nécessite une application externe pour être visualisé correctement avec toutes ses fonctionnalités (images, animations, formatage).
+        </p>
+        <div style="
+          background: #fff;
+          border-radius: 8px;
+          padding: 24px;
+          margin: 20px 0;
+          border-left: 4px solid #d32f2f;
+          text-align: left;
+          max-width: 500px;
+        ">
+          <h3 style="margin: 0 0 12px 0; color: #d32f2f;">📄 Informations du fichier :</h3>
+          <div style="margin-bottom: 8px;"><strong>Nom :</strong> ${fileName}</div>
+          <div style="margin-bottom: 8px;"><strong>Taille :</strong> ${await getFileSize(filePath)}</div>
+          <div style="margin-bottom: 8px;"><strong>Format :</strong> PowerPoint (.pptx)</div>
+          <div><strong>Chemin :</strong> <span style="font-family: monospace; background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">${filePath}</span></div>
+        </div>
+        <div style="
+          background: #fff3cd;
+          border: 1px solid #ffeaa7;
+          border-radius: 8px;
+          padding: 16px;
+          margin: 20px 0;
+          max-width: 600px;
+        ">
+          <h4 style="margin: 0 0 8px 0; color: #856404;">💡 Solutions recommandées :</h4>
+          <ul style="text-align: left; margin: 0; padding-left: 20px; color: #856404;">
+            <li>Microsoft PowerPoint (Windows/Mac)</li>
+            <li>LibreOffice Impress (gratuit)</li>
+            <li>Google Slides (en ligne)</li>
+            <li>PowerPoint Online (Microsoft)</li>
+          </ul>
+        </div>
+        <button onclick="alert('Fichier ${fileName} - Utilisez PowerPoint ou une application compatible pour visualiser la présentation')" style="
+          background: #d32f2f;
+          color: white;
+          border: none;
+          padding: 12px 24px;
+          border-radius: 6px;
+          font-size: 16px;
+          cursor: pointer;
+          margin-top: 16px;
+        ">
+          📁 Ouvrir avec application externe
+        </button>
+      </div>
+    `;
+    
+    // Mettre en surbrillance le fichier actuel dans la sidebar
+    highlightCurrentFile(filePath);
+    
+  } catch (error) {
+    console.error('Erreur lors du chargement du fichier PowerPoint:', error);
+    const hint = document.createElement('div');
+    hint.textContent = 'Erreur lors du chargement du fichier PowerPoint.';
+    canvas.appendChild(hint);
+  }
+}
+
+// Fonction pour charger des scripts dynamiquement
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+// Fonction pour extraire le texte des slides
+function extractSlideText(slideXml) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(slideXml, 'text/xml');
+    
+    // Extraire tous les textes
+    const textElements = doc.querySelectorAll('a\\:t, t');
+    const texts = Array.from(textElements).map(el => el.textContent).filter(t => t.trim());
+    
+    // Essayer de déterminer le titre (premier texte généralement)
+    const title = texts[0] || 'Slide sans titre';
+    const content = texts.slice(1).join('\n') || 'Contenu non disponible';
+    
+    return { title, content };
+  } catch (error) {
+    return { 
+      title: 'Slide', 
+      content: 'Impossible d\'extraire le contenu' 
+    };
+  }
+}
+
+// Fonction pour extraire les slides avec images et formatage (VERSION CORRIGÉE)
+async function extractSlideWithImages(slideXml, images) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(slideXml, 'text/xml');
+    
+    console.log('=== DEBUG SLIDE XML ===');
+    console.log('XML reçu:', slideXml.substring(0, 500) + '...');
+    
+    // Extraire les textes correctement - chercher dans les shapes (a:sp)
+    const textElements = [];
+    const shapes = doc.querySelectorAll('a\\:sp');
+    
+    console.log(`Nombre de shapes trouvés: ${shapes.length}`);
+    
+    shapes.forEach((shape, shapeIndex) => {
+      console.log(`Shape ${shapeIndex}:`, shape.outerHTML.substring(0, 200) + '...');
+      
+      // Chercher les paragraphes dans cette shape
+      const paragraphs = shape.querySelectorAll('a\\:p');
+      console.log(`  - Paragraphes: ${paragraphs.length}`);
+      
+      paragraphs.forEach((p, pIndex) => {
+        const texts = p.querySelectorAll('a\\:t');
+        console.log(`    - Paragraphe ${pIndex}, textes: ${texts.length}`);
+        
+        const paragraphText = Array.from(texts).map(t => t.textContent).join('');
+        if (paragraphText.trim()) {
+          console.log(`    - Texte: "${paragraphText}"`);
+          textElements.push(paragraphText.trim());
+        }
+      });
+    });
+    
+    // Extraire les images correctement
+    const slideImages = [];
+    const imageShapes = doc.querySelectorAll('a\\:pic');
+    
+    console.log(`Nombre d'images trouvées: ${imageShapes.length}`);
+    
+    imageShapes.forEach((pic, picIndex) => {
+      console.log(`Image ${picIndex}:`, pic.outerHTML.substring(0, 200) + '...');
+      
+      const blip = pic.querySelector('a\\:blip');
+      if (blip) {
+        const embed = blip.getAttribute('r\\:embed');
+        console.log(`  - Embed ID: ${embed}`);
+        
+        if (embed) {
+          // Chercher l'image correspondante dans les médias
+          const imagePath = Object.keys(images).find(path => {
+            // L'embed ID correspond souvent au nom de fichier
+            const fileName = path.split('/').pop().split('.')[0];
+            return embed.includes(fileName) || path.includes(embed);
+          });
+          
+          if (imagePath) {
+            console.log(`  - Image trouvée: ${imagePath}`);
+            slideImages.push(images[imagePath]);
+          } else {
+            console.log(`  - Aucune image trouvée pour embed: ${embed}`);
+            console.log(`  - Images disponibles:`, Object.keys(images));
+          }
+        }
+      }
+    });
+    
+    console.log('=== RÉSULTAT FINAL ===');
+    console.log('Textes extraits:', textElements);
+    console.log('Images extraites:', slideImages.length);
+    
+    const title = textElements[0] || 'Slide sans titre';
+    const content = textElements.slice(1);
+    
+    return {
+      title,
+      content,
+      images: slideImages,
+      shapes: []
+    };
+  } catch (error) {
+    console.error('Erreur extraction slide:', error);
+    return {
+      title: 'Slide',
+      content: ['Impossible d\'extraire le contenu'],
+      images: [],
+      shapes: []
+    };
+  }
+}
+
+// Fonction pour afficher les slides
+function displaySlides(slides, container, counter, prevBtn, nextBtn) {
+  let currentSlide = 0;
+  
+  function showSlide(index) {
+    const slide = slides[index];
+    container.innerHTML = `
+      <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 40px;
+        max-width: 800px;
+        width: 100%;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: center;
+      ">
+        <h2 style="
+          color: #d32f2f;
+          margin: 0 0 24px 0;
+          font-size: 28px;
+          border-bottom: 2px solid #e0e0e0;
+          padding-bottom: 16px;
+        ">${slide.title}</h2>
+        <div style="
+          font-size: 16px;
+          line-height: 1.6;
+          color: #333;
+          white-space: pre-line;
+          text-align: left;
+        ">${slide.content}</div>
+      </div>
+    `;
+    
+    counter.textContent = `${index + 1} / ${slides.length}`;
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === slides.length - 1;
+    
+    prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+    nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+  }
+  
+  prevBtn.onclick = () => {
+    if (currentSlide > 0) {
+      currentSlide--;
+      showSlide(currentSlide);
+    }
+  };
+  
+  nextBtn.onclick = () => {
+    if (currentSlide < slides.length - 1) {
+      currentSlide++;
+      showSlide(currentSlide);
+    }
+  };
+  
+  // Afficher le premier slide
+  showSlide(0);
+}
+
+// Fonction pour afficher les slides avec images (style Google Slides)
+function displaySlidesWithImages(slides, container, counter, prevBtn, nextBtn) {
+  let currentSlide = 0;
+  
+  function showSlide(index) {
+    const slide = slides[index];
+    
+    // Créer le contenu de la slide avec images
+    let imagesHtml = '';
+    if (slide.images && slide.images.length > 0) {
+      imagesHtml = slide.images.map(img => `
+        <div style="margin: 16px 0; text-align: center;">
+          <img src="${img}" style="
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            object-fit: contain;
+          " />
+        </div>
+      `).join('');
+    }
+    
+    // Créer le contenu texte
+    let contentHtml = '';
+    if (slide.content && slide.content.length > 0) {
+      contentHtml = slide.content.map(text => `
+        <div style="
+          margin: 12px 0;
+          font-size: 16px;
+          line-height: 1.6;
+          color: #333;
+          text-align: left;
+        ">${text}</div>
+      `).join('');
+    }
+    
+    container.innerHTML = `
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        max-width: 900px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        text-align: center;
+        position: relative;
+      ">
+        <div style="
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          background: rgba(211, 47, 47, 0.1);
+          color: #d32f2f;
+          padding: 4px 12px;
+          border-radius: 16px;
+          font-size: 12px;
+          font-weight: 600;
+        ">
+          Slide ${index + 1}
+        </div>
+        
+        <h1 style="
+          color: #d32f2f;
+          margin: 0 0 32px 0;
+          font-size: 32px;
+          font-weight: bold;
+          border-bottom: 3px solid #e0e0e0;
+          padding-bottom: 16px;
+          text-align: center;
+        ">${slide.title}</h1>
+        
+        ${imagesHtml}
+        
+        <div style="
+          margin-top: 24px;
+          text-align: left;
+        ">
+          ${contentHtml}
+        </div>
+        
+        ${slide.shapes && slide.shapes.length > 0 ? `
+          <div style="
+            margin-top: 24px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #d32f2f;
+          ">
+            <div style="color: #666; font-size: 14px;">
+              📊 Cette slide contient ${slide.shapes.length} élément(s) graphique(s)
+            </div>
+          </div>
+        ` : ''}
+      </div>
+    `;
+    
+    counter.textContent = `${index + 1} / ${slides.length}`;
+    prevBtn.disabled = index === 0;
+    nextBtn.disabled = index === slides.length - 1;
+    
+    prevBtn.style.opacity = prevBtn.disabled ? '0.5' : '1';
+    nextBtn.style.opacity = nextBtn.disabled ? '0.5' : '1';
+  }
+  
+  prevBtn.onclick = () => {
+    if (currentSlide > 0) {
+      currentSlide--;
+      showSlide(currentSlide);
+    }
+  };
+  
+  nextBtn.onclick = () => {
+    if (currentSlide < slides.length - 1) {
+      currentSlide++;
+      showSlide(currentSlide);
+    }
+  };
+  
+  // Afficher le premier slide
+  showSlide(0);
+}
+
+// Fonction utilitaire pour obtenir la taille d'un fichier
+async function getFileSize(filePath) {
+  try {
+    const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
+    const base64Data = dataUrl.split(',')[1];
+    const bytes = atob(base64Data).length;
+    
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+  } catch (error) {
+    return 'Taille inconnue';
+  }
+}
+
+async function renderOpenDocument(filePath, canvas, docType) {
+  try {
+    // Créer un conteneur pour le document OpenDocument
+    const odContainer = document.createElement('div');
+    odContainer.style.cssText = `
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+    `;
+    
+    // Icons et titres selon le type
+    const configs = {
+      text: { icon: '📝', title: 'Document OpenOffice Writer', color: '#4caf50' },
+      spreadsheet: { icon: '📊', title: 'Tableur OpenOffice Calc', color: '#2196f3' },
+      presentation: { icon: '📋', title: 'Présentation OpenOffice Impress', color: '#ff9800' }
+    };
+    
+    const config = configs[docType] || configs.text;
+    
+    // Header avec contrôles
+    const header = document.createElement('div');
+    header.style.cssText = `
+      background: ${config.color};
+      color: white;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+    `;
+    
+    const title = document.createElement('div');
+    title.textContent = `${config.icon} ${config.title}`;
+    
+    const info = document.createElement('div');
+    info.style.cssText = `
+      background: rgba(255,255,255,0.2);
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+    `;
+    info.textContent = filePath.split(/[\\/]/).pop();
+    
+    header.appendChild(title);
+    header.appendChild(info);
+    
+    // Zone de contenu du document
+    const docArea = document.createElement('div');
+    docArea.style.cssText = `
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background: #f5f5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    // Loading
+    const loading = document.createElement('div');
+    loading.textContent = '⏳ Chargement du document...';
+    loading.style.cssText = `
+      font-size: 16px;
+      color: #666;
+    `;
+    docArea.appendChild(loading);
+    
+    odContainer.appendChild(header);
+    odContainer.appendChild(docArea);
+    canvas.appendChild(odContainer);
+    
+    // Charger le fichier ODT avec WebODF
+    try {
+      const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
+      const response = await fetch(dataUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Utiliser JSZip pour lire le fichier ODT et extraire les images
+      if (!window.JSZip) {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+      }
+      
+      const zip = new JSZip();
+      const contents = await zip.loadAsync(arrayBuffer);
+      
+      // Extraire toutes les images d'abord
+      const images = {};
+      for (const [filename, file] of Object.entries(contents.files)) {
+        if (filename.match(/Pictures\/[^\/]+\.(png|jpg|jpeg|gif|svg|bmp)/)) {
+          const imageData = await file.async('base64');
+          const ext = filename.split('.').pop().toLowerCase();
+          images[filename] = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${imageData}`;
+        }
+      }
+      
+      // Lire le contenu principal avec images
+      let documentContent = '';
+      
+      if (docType === 'text') {
+        // Pour les documents texte ODT
+        if (contents.files['content.xml']) {
+          const contentXml = await contents.files['content.xml'].async('text');
+          documentContent = await extractODTWithImages(contentXml, images);
+        }
+      } else if (docType === 'spreadsheet') {
+        // Pour les tableurs ODS
+        if (contents.files['content.xml']) {
+          const contentXml = await contents.files['content.xml'].async('text');
+          documentContent = await extractODSWithImages(contentXml, images);
+        }
+      } else if (docType === 'presentation') {
+        // Pour les présentations ODP
+        if (contents.files['content.xml']) {
+          const contentXml = await contents.files['content.xml'].async('text');
+          documentContent = await extractODPWithImages(contentXml, images);
+        }
+      }
+      
+      // Si aucun contenu trouvé
+      if (!documentContent) {
+        documentContent = `
+          <div style="text-align: center; color: ${config.color};">
+            <div style="font-size: 48px; margin-bottom: 16px;">${config.icon}</div>
+            <h3>Document OpenDocument détecté</h3>
+            <p>Le fichier est valide mais son contenu n'est pas entièrement analysable.</p>
+            <div style="margin-top: 20px; padding: 16px; background: #fff; border-radius: 8px; border-left: 4px solid ${config.color};">
+              <strong>Fichier :</strong> ${filePath.split(/[\\/]/).pop()}<br>
+              <strong>Taille :</strong> ${await getFileSize(filePath)}<br>
+              <strong>Type :</strong> ${config.title}
+            </div>
+          </div>
+        `;
+      }
+      
+      // Afficher le contenu
+      docArea.innerHTML = documentContent;
+      
+    } catch (error) {
+      console.error('Erreur lors du parsing OpenDocument:', error);
+      docArea.innerHTML = `
+        <div style="text-align: center; color: ${config.color};">
+          <div style="font-size: 48px; margin-bottom: 16px;">${config.icon}</div>
+          <h3>Erreur de lecture</h3>
+          <p>Impossible d'analyser le fichier OpenDocument.</p>
+          <div style="margin-top: 20px; padding: 16px; background: #fff; border-radius: 8px; border-left: 4px solid #f44336;">
+            <strong>Erreur :</strong> ${error.message}
+          </div>
+        </div>
+      `;
+    }
+    
+    // Mettre en surbrillance le fichier actuel dans la sidebar
+    highlightCurrentFile(filePath);
+    
+  } catch (error) {
+    console.error('Erreur lors du chargement du fichier OpenDocument:', error);
+    const hint = document.createElement('div');
+    hint.textContent = 'Erreur lors du chargement du fichier OpenDocument.';
+    canvas.appendChild(hint);
+  }
+}
+
+// Fonction pour extraire le texte des documents ODT
+function extractODTText(contentXml) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire tous les paragraphes et textes
+    const textElements = doc.querySelectorAll('text\\:p, p');
+    const paragraphs = Array.from(textElements).map(el => {
+      const text = el.textContent.trim();
+      return text ? `<p style="margin-bottom: 12px; line-height: 1.6;">${text}</p>` : '';
+    }).filter(p => p);
+    
+    if (paragraphs.length === 0) {
+      return null;
+    }
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 40px;
+        max-width: 800px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        text-align: left;
+      ">
+        <div style="color: #333; font-size: 16px;">
+          ${paragraphs.join('')}
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODT:', error);
+    return null;
+  }
+}
+
+// Fonction pour extraire les documents ODT avec images
+async function extractODTWithImages(contentXml, images) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire les paragraphes avec formatage
+    const textElements = doc.querySelectorAll('text\\:p, p');
+    const paragraphs = [];
+    
+    textElements.forEach(p => {
+      const text = p.textContent.trim();
+      if (text) {
+        // Vérifier s'il y a du formatage
+        const isHeading = p.getAttribute('text\\:style-name')?.includes('Heading') || 
+                         p.getAttribute('style-name')?.includes('Heading');
+        const isBold = p.querySelector('text\\:span[text\\:style-name*="Bold"], span[style-name*="Bold"]');
+        
+        let style = "margin-bottom: 12px; line-height: 1.6;";
+        let tag = "p";
+        
+        if (isHeading) {
+          style = "margin: 24px 0 16px 0; font-size: 20px; font-weight: bold; color: #4caf50;";
+          tag = "h3";
+        } else if (isBold) {
+          style = "margin-bottom: 12px; line-height: 1.6; font-weight: bold;";
+        }
+        
+        paragraphs.push(`<${tag} style="${style}">${text}</${tag}>`);
+      }
+    });
+    
+    // Extraire les images
+    const imageElements = doc.querySelectorAll('draw\\:image, image');
+    const imageHtml = [];
+    
+    imageElements.forEach(img => {
+      const href = img.getAttribute('xlink\\:href') || img.getAttribute('href');
+      if (href) {
+        const imagePath = Object.keys(images).find(path => 
+          path.includes(href) || href.includes(path.split('/').pop())
+        );
+        if (imagePath) {
+          imageHtml.push(`
+            <div style="margin: 20px 0; text-align: center;">
+              <img src="${images[imagePath]}" style="
+                max-width: 100%;
+                max-height: 400px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                object-fit: contain;
+              " />
+            </div>
+          `);
+        }
+      }
+    });
+    
+    // Combiner texte et images
+    const content = [...paragraphs, ...imageHtml].join('');
+    
+    if (!content) {
+      return null;
+    }
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 40px;
+        max-width: 800px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        text-align: left;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      ">
+        <div style="color: #333; font-size: 16px; line-height: 1.6;">
+          ${content}
+        </div>
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODT avec images:', error);
+    return null;
+  }
+}
+
+// Fonction pour extraire le contenu des tableurs ODS
+function extractODSContent(contentXml) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire les cellules du tableur
+    const cells = doc.querySelectorAll('table\\:table-cell, table-cell');
+    const cellData = Array.from(cells).map(cell => cell.textContent.trim()).filter(text => text);
+    
+    if (cellData.length === 0) {
+      return null;
+    }
+    
+    // Créer un aperçu simple du tableur
+    const rows = [];
+    for (let i = 0; i < Math.min(cellData.length, 50); i += 5) {
+      const row = cellData.slice(i, i + 5);
+      if (row.length > 0) {
+        rows.push(`<tr>${row.map(cell => `<td style="padding: 8px; border: 1px solid #ddd; background: #f9f9f9;">${cell}</td>`).join('')}</tr>`);
+      }
+    }
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 800px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      ">
+        <h3 style="color: #2196f3; margin-bottom: 20px;">Aperçu du tableur</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+          ${rows.join('')}
+        </table>
+        ${cellData.length > 50 ? '<p style="margin-top: 16px; color: #666; font-style: italic;">... et plus de données</p>' : ''}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODS:', error);
+    return null;
+  }
+}
+
+// Fonction pour extraire le contenu des présentations ODP
+function extractODPContent(contentXml) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire les slides/pages
+    const pages = doc.querySelectorAll('draw\\:page, page');
+    const slides = Array.from(pages).map((page, index) => {
+      const textElements = page.querySelectorAll('text\\:p, p');
+      const texts = Array.from(textElements).map(el => el.textContent.trim()).filter(t => t);
+      
+      return {
+        number: index + 1,
+        title: texts[0] || `Slide ${index + 1}`,
+        content: texts.slice(1).join('\n') || 'Contenu non disponible'
+      };
+    });
+    
+    if (slides.length === 0) {
+      return null;
+    }
+    
+    const slideList = slides.map(slide => `
+      <div style="
+        background: #f5f5f5;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+        border-left: 4px solid #ff9800;
+      ">
+        <h4 style="color: #ff9800; margin: 0 0 12px 0;">Slide ${slide.number}: ${slide.title}</h4>
+        <div style="color: #333; white-space: pre-line;">${slide.content}</div>
+      </div>
+    `).join('');
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        max-width: 800px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      ">
+        <h3 style="color: #ff9800; margin-bottom: 20px;">Contenu de la présentation (${slides.length} slides)</h3>
+        ${slideList}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODP:', error);
+    return null;
+  }
+}
+
+// Fonction pour extraire les tableurs ODS avec images
+async function extractODSWithImages(contentXml, images) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire les cellules avec formatage
+    const tables = doc.querySelectorAll('table\\:table, table');
+    const tablesHtml = [];
+    
+    tables.forEach((table, tableIndex) => {
+      const rows = table.querySelectorAll('table\\:table-row, tr');
+      const tableRows = [];
+      
+      rows.forEach(row => {
+        const cells = row.querySelectorAll('table\\:table-cell, td');
+        const cellData = Array.from(cells).map(cell => {
+          const text = cell.textContent.trim();
+          const isHeader = cell.getAttribute('table\\:style-name')?.includes('Header') ||
+                          cell.getAttribute('style-name')?.includes('Header');
+          
+          const style = isHeader ? 
+            "padding: 12px; border: 1px solid #ddd; background: #2196f3; color: white; font-weight: bold;" :
+            "padding: 8px; border: 1px solid #ddd; background: #f9f9f9;";
+          
+          return `<td style="${style}">${text}</td>`;
+        });
+        
+        if (cellData.length > 0) {
+          tableRows.push(`<tr>${cellData.join('')}</tr>`);
+        }
+      });
+      
+      if (tableRows.length > 0) {
+        tablesHtml.push(`
+          <div style="margin: 20px 0;">
+            <h4 style="color: #2196f3; margin-bottom: 12px;">Tableau ${tableIndex + 1}</h4>
+            <table style="width: 100%; border-collapse: collapse; border: 2px solid #2196f3;">
+              ${tableRows.join('')}
+            </table>
+          </div>
+        `);
+      }
+    });
+    
+    // Extraire les images
+    const imageElements = doc.querySelectorAll('draw\\:image, image');
+    const imageHtml = [];
+    
+    imageElements.forEach(img => {
+      const href = img.getAttribute('xlink\\:href') || img.getAttribute('href');
+      if (href) {
+        const imagePath = Object.keys(images).find(path => 
+          path.includes(href) || href.includes(path.split('/').pop())
+        );
+        if (imagePath) {
+          imageHtml.push(`
+            <div style="margin: 20px 0; text-align: center;">
+              <img src="${images[imagePath]}" style="
+                max-width: 100%;
+                max-height: 300px;
+                border-radius: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                object-fit: contain;
+              " />
+            </div>
+          `);
+        }
+      }
+    });
+    
+    const content = [...tablesHtml, ...imageHtml].join('');
+    
+    if (!content) {
+      return null;
+    }
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 900px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      ">
+        <h3 style="color: #2196f3; margin-bottom: 24px; text-align: center;">📊 Tableur OpenOffice Calc</h3>
+        ${content}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODS avec images:', error);
+    return null;
+  }
+}
+
+// Fonction pour extraire les présentations ODP avec images
+async function extractODPWithImages(contentXml, images) {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contentXml, 'text/xml');
+    
+    // Extraire les slides/pages avec images
+    const pages = doc.querySelectorAll('draw\\:page, page');
+    const slides = [];
+    
+    pages.forEach((page, index) => {
+      const textElements = page.querySelectorAll('text\\:p, p');
+      const texts = Array.from(textElements).map(el => el.textContent.trim()).filter(t => t);
+      
+      // Extraire les images de cette slide
+      const slideImages = [];
+      const imageElements = page.querySelectorAll('draw\\:image, image');
+      
+      imageElements.forEach(img => {
+        const href = img.getAttribute('xlink\\:href') || img.getAttribute('href');
+        if (href) {
+          const imagePath = Object.keys(images).find(path => 
+            path.includes(href) || href.includes(path.split('/').pop())
+          );
+          if (imagePath) {
+            slideImages.push(images[imagePath]);
+          }
+        }
+      });
+      
+      slides.push({
+        number: index + 1,
+        title: texts[0] || `Slide ${index + 1}`,
+        content: texts.slice(1),
+        images: slideImages
+      });
+    });
+    
+    if (slides.length === 0) {
+      return null;
+    }
+    
+    const slideList = slides.map(slide => {
+      const imagesHtml = slide.images.map(img => `
+        <div style="margin: 16px 0; text-align: center;">
+          <img src="${img}" style="
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            object-fit: contain;
+          " />
+        </div>
+      `).join('');
+      
+      const contentHtml = slide.content.map(text => `
+        <div style="margin: 8px 0; color: #333;">${text}</div>
+      `).join('');
+      
+      return `
+        <div style="
+          background: white;
+          border-radius: 12px;
+          padding: 24px;
+          margin-bottom: 20px;
+          border-left: 6px solid #ff9800;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        ">
+          <h4 style="color: #ff9800; margin: 0 0 16px 0; font-size: 20px;">
+            📋 Slide ${slide.number}: ${slide.title}
+          </h4>
+          ${imagesHtml}
+          <div style="margin-top: 16px;">
+            ${contentHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    return `
+      <div style="
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 900px;
+        width: 100%;
+        max-height: calc(100vh - 200px);
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      ">
+        <h3 style="color: #ff9800; margin-bottom: 24px; text-align: center;">
+          📋 Présentation OpenOffice Impress (${slides.length} slides)
+        </h3>
+        ${slideList}
+      </div>
+    `;
+  } catch (error) {
+    console.error('Erreur extraction ODP avec images:', error);
+    return null;
   }
 }
 
@@ -2900,4 +4261,59 @@ function showEditClasseurModal(classeur) {
       alert('Erreur lors de la modification: ' + error.message);
     }
   }, { once: true });
+}
+
+// Fonction pour gérer le redimensionnement de la sidebar du classeur
+function setupSidebarResize() {
+  const sidebar = document.querySelector('.classeur-sidebar');
+  const resizeHandle = document.querySelector('.classeur-sidebar .resize-handle');
+  
+  if (!sidebar || !resizeHandle) return;
+  
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+  
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = parseInt(window.getComputedStyle(sidebar).width, 10);
+    
+    // Ajouter une classe pour indiquer qu'on est en train de redimensionner
+    document.body.classList.add('resizing');
+    
+    e.preventDefault();
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const deltaX = startX - e.clientX; // Inversé car on redimensionne vers la gauche
+    const newWidth = startWidth + deltaX;
+    
+    // Limiter la largeur entre min-width et max-width
+    const minWidth = 200;
+    const maxWidth = 600;
+    const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+    
+    sidebar.style.width = `${clampedWidth}px`;
+    
+    // Mettre à jour la grille CSS pour que le viewer s'adapte
+    const layout = document.querySelector('.classeur-layout');
+    if (layout) {
+      layout.style.gridTemplateColumns = `1fr ${clampedWidth}px`;
+    }
+  });
+  
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      document.body.classList.remove('resizing');
+    }
+  });
+  
+  // Empêcher la sélection de texte pendant le redimensionnement
+  resizeHandle.addEventListener('selectstart', (e) => {
+    e.preventDefault();
+  });
 }
