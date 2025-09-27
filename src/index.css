@@ -123,7 +123,7 @@ body {
 .sidebar-header { display: grid; gap: 8px; }
 .sidebar-header input[type="search"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; }
 .sidebar-actions { display: flex; gap: 8px; }
-.tree { margin-top: 8px; overflow: auto; flex: 1; }
+.tree { margin-top: 8px; overflow-y: auto; overflow-x: auto; flex: 1; max-height: calc(100vh - 200px); }
 .tree .node { padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 .tree .node:hover { background: #f8fafc; }
 .tree .node.is-selected { background: #e2e8f0; }
@@ -152,8 +152,39 @@ p {
   margin-top: 16px;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
-  max-width: 760px;
+  gap: 16px;
+  max-width: 920px;
+  width: 100%;
+}
+.form-row-rootpath {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.form-row-rootpath label {
+  font-weight: 600;
+}
+.form-row-rootpath .rootpath-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+.form-row-rootpath #input-root-path {
+  width: 100%;
+  max-width: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  padding: 10px 12px;
+}
+.form-row-rootpath .muted {
+  color: #64748b;
+}
+.form-row-rootpath .mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.form-row-rootpath .btn {
+  white-space: nowrap;
 }
 
 .form-row {
@@ -224,6 +255,68 @@ input[type="search"] { padding: 8px 10px; border: 1px solid #cbd5e1; border-radi
   align-content: start; /* évite la répartition verticale qui crée de grands espaces */
   align-items: start;   /* aligne chaque carte en haut de sa piste */
   grid-auto-rows: min-content; /* compresse la hauteur implicite des lignes */
+}
+
+/* Corbeille - design amélioré */
+.trash-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  border-radius: 12px;
+  padding: 14px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+  min-height: 140px;
+}
+.trash-card .title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.trash-card .title-row .icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 16px;
+}
+.trash-card .meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 12px;
+}
+.trash-card .counts-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: #334155;
+  font-size: 12px;
+}
+.trash-card .actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.btn.icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
 }
 
 .card {

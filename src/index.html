@@ -89,17 +89,26 @@
         </div>
       </section>
       <section id="view-corbeille" class="view" role="region" aria-label="Corbeille">
-        <h1>Corbeille</h1>
-        <p>Supprimez définitivement ou restaurez des éléments.</p>
+        <div class="toolbar">
+          <h1>Corbeille</h1>
+          <div class="toolbar-actions">
+            <input id="search-trash" type="search" placeholder="Rechercher dans la corbeille…" />
+            <button id="btn-clear-trash" class="btn" style="background: #dc2626; color: white; border-color: #dc2626;">Vider la corbeille</button>
+          </div>
+        </div>
+        <div id="trash-list" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
       </section>
       <section id="view-parametres" class="view" role="region" aria-label="Paramètres">
         <h1>Paramètres</h1>
-        <p>Configurez le chemin système du dossier mère et du db.json.</p>
+        <p>Définissez un unique <strong>rootPath</strong>. Il servira pour le dossier mère (classeurs, archives, corbeille) et le fichier <code>db.json</code>.</p>
         <div class="settings-grid">
-          <div class="form-row">
+          <div class="form-row form-row-rootpath">
             <label for="input-root-path">Dossier mère de Classiflyer (rootPath)</label>
-            <input id="input-root-path" type="text" placeholder="Ex: ~/.classiflyer/config ou C:\\Users\\...\\AppData\\Roaming\\Classiflyer\\config" />
-            <button id="btn-browse-root" class="btn">Parcourir…</button>
+            <div class="rootpath-inputs">
+              <input id="input-root-path" type="text" placeholder="Ex: ~/.classiflyer/config ou C:\\Users\\...\\AppData\\Roaming\\Classiflyer\\config" title="Chemin complet du rootPath" />
+              <button id="btn-browse-root" class="btn">Parcourir…</button>
+            </div>
+            <small class="muted">db.json: <code id="db-path" class="mono"></code></small>
           </div>
           <div class="form-actions">
             <button id="btn-save-settings" class="btn primary">Enregistrer</button>

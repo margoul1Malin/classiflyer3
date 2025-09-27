@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('classiflyer', {
   renameArchiveFolder: async (folderId, newName) => ipcRenderer.invoke('archives:renameFolder', folderId, newName),
   moveClasseurToArchiveFolder: async (classeurId, folderId = null) => ipcRenderer.invoke('archives:moveClasseur', classeurId, folderId),
   updateArchivedClasseur: async (classeurId, updates) => ipcRenderer.invoke('archives:updateClasseur', classeurId, updates),
+  // Corbeille API
+  trashList: async () => ipcRenderer.invoke('trash:list'),
+  trashMoveClasseur: async (id, context) => ipcRenderer.invoke('trash:moveClasseur', id, context), // context: 'mes' | 'archives'
+  trashRestoreClasseur: async (id) => ipcRenderer.invoke('trash:restoreClasseur', id),
+  trashDeleteClasseur: async (id) => ipcRenderer.invoke('trash:deleteClasseur', id),
+  trashClearAll: async () => ipcRenderer.invoke('trash:clearAll'),
   // Utilitaires
   toFileUrl: (absolutePath) => {
     // Convertir le chemin en URL file:// compatible Windows/Linux

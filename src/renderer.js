@@ -80,12 +80,14 @@ window.addEventListener('DOMContentLoaded', () => {
   initSettingsView();
   initClasseursView();
   initArchivesView();
+  initTrashView();
 });
 
 function initSettingsView() {
   const input = document.getElementById('input-root-path');
   const browseBtn = document.getElementById('btn-browse-root');
   const saveBtn = document.getElementById('btn-save-settings');
+  const dbPathEl = document.getElementById('db-path');
   if (!(input instanceof HTMLInputElement) || !(browseBtn instanceof HTMLElement) || !(saveBtn instanceof HTMLElement)) {
     return;
   }
@@ -94,6 +96,7 @@ function initSettingsView() {
     window.classiflyer.getConfig().then((cfg) => {
       if (cfg && cfg.rootPath) {
         input.value = cfg.rootPath;
+        if (dbPathEl) dbPathEl.textContent = `${cfg.rootPath}/db.json`;
       }
     }).catch(() => {});
   }
@@ -115,6 +118,7 @@ function initSettingsView() {
       // Optionally provide lightweight feedback
       saveBtn.textContent = 'Enregistré';
       setTimeout(() => { saveBtn.textContent = 'Enregistrer'; }, 1200);
+      if (dbPathEl) dbPathEl.textContent = `${newPath}/db.json`;
     } catch (e) {
       saveBtn.textContent = 'Erreur';
       setTimeout(() => { saveBtn.textContent = 'Enregistrer'; }, 1200);
@@ -317,9 +321,13 @@ function renderClasseurs(container, classeurs) {
     deleteItem.textContent = 'Supprimer';
     deleteItem.addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (confirm('Supprimer ce classeur ?')) {
-        await window.classiflyer.deleteClasseur(item.id);
+      if (confirm('Envoyer ce classeur à la corbeille ?')) {
+        try {
+          await window.classiflyer.trashMoveClasseur(item.id, 'mes');
         await window.classiflyer.listClasseurs().then((l) => renderClasseurs(container, l));
+        } catch (err) {
+          alert('Erreur: ' + (err?.message || 'Impossible de déplacer vers corbeille'));
+        }
       }
       menu.classList.remove('is-open');
     });
@@ -1414,36 +1422,36 @@ async function renderExcel(filePath, canvas) {
     // Afficher les contrôles de zoom pour Excel
     const zoomControls = document.getElementById('zoom-controls');
     if (zoomControls) {
-      zoomControls.style.display = 'flex';
-      
-      let currentZoom = 1;
-      
-      // Fonction pour mettre à jour le zoom Excel
-      const updateExcelZoom = (zoom) => {
-        currentZoom = zoom;
+    zoomControls.style.display = 'flex';
+    
+    let currentZoom = 1;
+    
+    // Fonction pour mettre à jour le zoom Excel
+    const updateExcelZoom = (zoom) => {
+      currentZoom = zoom;
         const table = contentContainer.querySelector('table');
-        if (table) {
-          table.style.transform = `scale(${zoom})`;
-          table.style.transformOrigin = 'top left';
-        }
-        document.getElementById('zoom-level').textContent = `${Math.round(zoom * 100)}%`;
-      };
-      
-      // Boutons de zoom Excel
-      document.getElementById('zoom-in').onclick = () => {
-        updateExcelZoom(Math.min(currentZoom * 1.2, 3));
-      };
-      
-      document.getElementById('zoom-out').onclick = () => {
-        updateExcelZoom(Math.max(currentZoom / 1.2, 0.3));
-      };
-      
-      document.getElementById('zoom-reset').onclick = () => {
-        updateExcelZoom(1);
-      };
-      
-      // Initialiser l'affichage du zoom Excel
+      if (table) {
+        table.style.transform = `scale(${zoom})`;
+        table.style.transformOrigin = 'top left';
+      }
+      document.getElementById('zoom-level').textContent = `${Math.round(zoom * 100)}%`;
+    };
+    
+    // Boutons de zoom Excel
+    document.getElementById('zoom-in').onclick = () => {
+      updateExcelZoom(Math.min(currentZoom * 1.2, 3));
+    };
+    
+    document.getElementById('zoom-out').onclick = () => {
+      updateExcelZoom(Math.max(currentZoom / 1.2, 0.3));
+    };
+    
+    document.getElementById('zoom-reset').onclick = () => {
       updateExcelZoom(1);
+    };
+    
+    // Initialiser l'affichage du zoom Excel
+    updateExcelZoom(1);
     }
     
     // Mettre en surbrillance le fichier actuel dans la sidebar
@@ -1503,6 +1511,160 @@ function initArchivesView() {
   // Charger immédiatement si la vue est déjà visible (au rechargement)
   if (view.classList.contains('is-visible')) {
     loadArchivesView();
+  }
+}
+
+// ===== CORBEILLE =====
+function initTrashView() {
+  const view = document.getElementById('view-corbeille');
+  if (!view) return;
+
+  const listEl = document.getElementById('trash-list');
+  const searchInput = document.getElementById('search-trash');
+  const clearBtn = document.getElementById('btn-clear-trash');
+
+  async function refresh() {
+    try {
+      const items = await window.classiflyer.trashList();
+      const q = (searchInput instanceof HTMLInputElement ? searchInput.value.trim().toLowerCase() : '');
+      const filtered = q ? items.filter((x) => (x.name || '').toLowerCase().includes(q)) : items;
+      renderTrash(listEl, filtered);
+    } catch (e) {
+      if (listEl) listEl.innerHTML = '<div class="muted">Erreur de chargement de la corbeille</div>';
+    }
+  }
+
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.addEventListener('input', refresh);
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      if (confirm('Êtes-vous sûr de vouloir vider complètement la corbeille ? Cette action est irréversible et supprimera définitivement tous les classeurs et leur contenu.')) {
+        try {
+          await window.classiflyer.trashClearAll();
+          await refresh();
+        } catch (error) {
+          alert('Erreur lors de la suppression: ' + (error?.message || 'Suppression impossible'));
+        }
+      }
+    });
+  }
+
+  // Charger quand on arrive sur l’onglet
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((m) => {
+      if (m.type === 'attributes' && m.attributeName === 'class') {
+        if (view.classList.contains('is-visible')) refresh();
+      }
+    });
+  });
+  observer.observe(view, { attributes: true });
+
+  // Chargement initial si déjà visible
+  if (view.classList.contains('is-visible')) refresh();
+}
+
+function renderTrash(container, items) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (const it of items) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.background = it.primaryColor || '#ffffff';
+    card.style.borderRight = `8px solid ${it.secondaryColor || '#000000'}`;
+
+    const title = document.createElement('div');
+    title.className = 'card-title';
+    title.textContent = it.name || '(Sans nom)';
+    // Force text color on title to ensure no CSS override
+    title.style.color = it.tertiaryColor || '#0b1220';
+
+    // Compter les fichiers et dossiers
+    const fileCount = countClasseurContent(it);
+    const counter = document.createElement('div');
+    counter.className = 'classeur-counter';
+    counter.textContent = `${fileCount.files} fichier${fileCount.files > 1 ? 's' : ''}, ${fileCount.folders} dossier${fileCount.folders > 1 ? 's' : ''}`;
+    counter.style.color = it.tertiaryColor || '#0b1220';
+    counter.style.fontSize = '12px';
+    counter.style.position = 'absolute';
+    counter.style.bottom = '8px';
+    counter.style.left = '8px';
+    counter.style.opacity = '0.8';
+
+    // Informations de suppression
+    const metaInfo = document.createElement('div');
+    metaInfo.className = 'trash-meta';
+    metaInfo.style.position = 'absolute';
+    metaInfo.style.bottom = '32px';
+    metaInfo.style.left = '8px';
+    metaInfo.style.right = '40px';
+    metaInfo.style.fontSize = '10px';
+    metaInfo.style.color = it.tertiaryColor || '#0b1220';
+    metaInfo.style.opacity = '0.7';
+    
+    const from = it.deletedFrom === 'archives' ? 'Archives' : 'Mes Classeurs';
+    const when = it.deletedAt ? new Date(it.deletedAt).toLocaleString() : '';
+    metaInfo.innerHTML = `<div>Supprimé de: ${from}</div><div>Le: ${when}</div>`;
+
+    const menuBtn = document.createElement('button');
+    menuBtn.className = 'btn card-menu-btn';
+    menuBtn.textContent = '⋯';
+
+    const menu = document.createElement('div');
+    menu.className = 'menu';
+
+    const restoreItem = document.createElement('div');
+    restoreItem.className = 'menu-item';
+    restoreItem.textContent = '🛠️ Restaurer';
+    restoreItem.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await window.classiflyer.trashRestoreClasseur(it.id);
+        // Refresh
+        const list = await window.classiflyer.trashList();
+        renderTrash(container, list);
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Restauration impossible'));
+      }
+      menu.classList.remove('is-open');
+    });
+
+    const deleteItem = document.createElement('div');
+    deleteItem.className = 'menu-item';
+    deleteItem.textContent = '🗑️ Supprimer définitivement';
+    deleteItem.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm('Supprimer définitivement ? Cette action est irréversible.')) return;
+      try {
+        await window.classiflyer.trashDeleteClasseur(it.id);
+        const list = await window.classiflyer.trashList();
+        renderTrash(container, list);
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Suppression impossible'));
+      }
+      menu.classList.remove('is-open');
+    });
+
+    menu.appendChild(restoreItem);
+    menu.appendChild(deleteItem);
+
+    menuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = menu.classList.contains('is-open');
+      document.querySelectorAll('.menu.is-open').forEach((el) => el.classList.remove('is-open'));
+      if (!isOpen) menu.classList.add('is-open');
+    });
+
+    document.addEventListener('click', () => menu.classList.remove('is-open'));
+
+    card.appendChild(title);
+    card.appendChild(counter);
+    card.appendChild(metaInfo);
+    card.appendChild(menuBtn);
+    card.appendChild(menu);
+
+    container.appendChild(card);
   }
 }
 
@@ -1883,8 +2045,16 @@ function renderArchivedClasseurs(container, archives) {
     deleteItem.textContent = 'Supprimer';
     deleteItem.addEventListener('click', async (e) => {
       e.stopPropagation();
-      await window.classiflyer.deleteArchivedClasseur(item.id);
-      await loadArchivedClasseurs();
+      if (confirm('Envoyer ce classeur à la corbeille ?')) {
+        try {
+          await window.classiflyer.trashMoveClasseur(item.id, 'archives');
+          // Recharger en préservant l'état du dossier sélectionné
+          const currentFolderId = getArchiveState();
+          await loadArchivedClasseurs(currentFolderId);
+        } catch (err) {
+          alert('Erreur: ' + (err?.message || 'Impossible de déplacer vers corbeille'));
+        }
+      }
       menu.classList.remove('is-open');
     });
 
@@ -1894,7 +2064,9 @@ function renderArchivedClasseurs(container, archives) {
     unarchiveItem.addEventListener('click', async (e) => {
       e.stopPropagation();
       await window.classiflyer.unarchiveClasseur(item.id);
-      await loadArchivedClasseurs();
+      // Recharger en préservant l'état du dossier sélectionné
+      const currentFolderId = getArchiveState();
+      await loadArchivedClasseurs(currentFolderId);
       menu.classList.remove('is-open');
     });
 
@@ -1926,17 +2098,43 @@ function renderArchivedClasseurs(container, archives) {
   }
 }
 
-function filterArchives(searchTerm) {
-  const cards = document.querySelectorAll('#archives-grid .card');
-  const term = searchTerm.toLowerCase();
+async function filterArchives(searchTerm) {
+  const container = document.getElementById('archives-grid');
+  if (!container) return;
 
-  for (const card of cards) {
-    const title = card.querySelector('.card-title')?.textContent?.toLowerCase() || '';
-    if (title.includes(term)) {
-      card.style.display = '';
-    } else {
-      card.style.display = 'none';
-    }
+  const term = searchTerm.toLowerCase().trim();
+  
+  if (term === '') {
+    // Si pas de terme de recherche, revenir à l'affichage normal du dossier courant
+    const currentFolderId = getArchiveState();
+    await loadArchivedClasseurs(currentFolderId);
+    return;
+  }
+
+  try {
+    // Charger TOUS les classeurs archivés pour la recherche globale
+    const allArchives = await window.classiflyer.listArchives();
+    
+    // Filtrer pour s'assurer qu'on n'a que des classeurs, pas des dossiers
+    const onlyClasseurs = allArchives.filter(item => {
+      const isClasseur = item.hasOwnProperty('primaryColor') || item.hasOwnProperty('files') || item.hasOwnProperty('folders');
+      const isRootPath = item.sys_path && item.sys_path.match(/\/archives\/[^\/]+$/);
+      const hasSameName = item.name && (item.name === 'Projets 2K25 RELEASED' || item.name === 'a');
+      const isDuplicateFolder = isRootPath && hasSameName && !item.archiveFolderId;
+      
+      return isClasseur && !isDuplicateFolder;
+    });
+
+    // Filtrer par terme de recherche
+    const filteredResults = onlyClasseurs.filter(classeur => {
+      const title = (classeur.name || '').toLowerCase();
+      return title.includes(term);
+    });
+
+    // Afficher les résultats de recherche
+    renderArchivedClasseurs(container, filteredResults);
+  } catch (error) {
+    console.error('Erreur lors de la recherche dans les archives:', error);
   }
 }
 
@@ -2082,15 +2280,34 @@ async function renameArchiveFolder(folderId) {
 }
 
 async function deleteArchiveFolder(folderId) {
-  if (!confirm('Êtes-vous sûr de vouloir supprimer ce dossier et tout son contenu ?')) {
+  if (!confirm('Envoyer ce dossier et tous ses classeurs à la corbeille ?')) {
     return;
   }
 
   try {
+    // Récupérer tous les classeurs du dossier
+    const allArchives = await window.classiflyer.listArchives();
+    const classeursInFolder = allArchives.filter(item => {
+      const isClasseur = item.hasOwnProperty('primaryColor') || item.hasOwnProperty('files') || item.hasOwnProperty('folders');
+      return isClasseur && item.archiveFolderId === folderId;
+    });
+
+    // Envoyer tous les classeurs du dossier à la corbeille
+    for (const classeur of classeursInFolder) {
+      try {
+        await window.classiflyer.trashMoveClasseur(classeur.id, 'archives');
+      } catch (err) {
+        console.error(`Erreur lors de l'envoi du classeur ${classeur.name} à la corbeille:`, err);
+      }
+    }
+
+    // Maintenant supprimer le dossier vide
     await window.classiflyer.deleteArchiveFolder(folderId);
+    
     await loadArchiveFolders(true); // Préserver les états d'expansion
     // Recharger aussi les classeurs car ils peuvent avoir été affectés
-    await loadArchivedClasseurs();
+    const currentFolderId = getArchiveState();
+    await loadArchivedClasseurs(currentFolderId);
   } catch (error) {
     console.error('Erreur lors de la suppression du dossier:', error);
     alert('Erreur lors de la suppression du dossier');

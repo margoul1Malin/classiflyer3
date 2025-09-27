@@ -1,8 +1,8 @@
 {
-  "name": "classiflyer3",
-  "productName": "classiflyer3",
+  "name": "ClassiFlyer",
+  "productName": "ClassiFlyer",
   "version": "1.0.0",
-  "description": "My Electron application description",
+  "description": "Desktop App for Managing Content as Different Ways Reducing Paper Usage",
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
