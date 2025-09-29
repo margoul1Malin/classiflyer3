@@ -862,6 +862,7 @@ function openCreateSubfolderModal(parentFolderId, parentFolderName) {
 let pdfDoc = null;
 let currentPdfPage = 1;
 let totalPdfPages = 1;
+let pdfRenderTask = null; // tâche de rendu PDF.js active
 
 async function renderViewer(file) {
   const canvas = document.getElementById('viewer-canvas');
@@ -2284,9 +2285,8 @@ async function renderPDF(filePath, canvas, pdfNav) {
     totalPdfPages = pdfDoc.numPages;
     currentPdfPage = 1;
 
-    // Mettre à jour l'info de page et afficher la première page
+    // Mettre à jour l'info de page
     updatePdfPageInfo();
-    await renderCurrentPdfPage(pdfCanvas);
     
     // Afficher les contrôles de zoom pour PDF
     const zoomControls = document.getElementById('zoom-controls');
@@ -2314,8 +2314,19 @@ async function renderPDF(filePath, canvas, pdfNav) {
       await updatePdfZoom(1.5);
     };
     
-    // Initialiser l'affichage du zoom PDF
-    updatePdfZoom(1.5);
+    // Initialiser l'affichage du zoom PDF (et rendre la première page)
+    await updatePdfZoom(currentZoom);
+
+    // Zoom à la molette sur le PDF (throttle)
+    let wheelThrottle = null;
+    canvas.addEventListener('wheel', async (e) => {
+      e.preventDefault();
+      if (wheelThrottle) return;
+      wheelThrottle = setTimeout(() => { wheelThrottle = null; }, 100);
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const nextZoom = Math.min(Math.max(currentZoom * delta, 0.5), 7.5);
+      await updatePdfZoom(nextZoom);
+    }, { passive: false });
     
     // Mettre en surbrillance le fichier actuel dans la sidebar
     highlightCurrentFile(filePath);
@@ -2328,7 +2339,7 @@ async function renderPDF(filePath, canvas, pdfNav) {
       prevBtn.onclick = async () => {
         if (currentPdfPage > 1) {
           currentPdfPage--;
-          await renderCurrentPdfPage(pdfCanvas);
+          await renderCurrentPdfPage(pdfCanvas, currentZoom);
           updatePdfPageInfo();
         }
       };
@@ -2338,7 +2349,7 @@ async function renderPDF(filePath, canvas, pdfNav) {
       nextBtn.onclick = async () => {
         if (currentPdfPage < totalPdfPages) {
           currentPdfPage++;
-          await renderCurrentPdfPage(pdfCanvas);
+          await renderCurrentPdfPage(pdfCanvas, currentZoom);
           updatePdfPageInfo();
         }
       };
@@ -2392,7 +2403,18 @@ async function renderCurrentPdfPage(canvas, scale = 1.5) {
     viewport: viewport
   };
 
-  await page.render(renderContext).promise;
+  // Annuler un rendu en cours si présent avant d'en lancer un nouveau
+  if (pdfRenderTask && typeof pdfRenderTask.cancel === 'function') {
+    try { pdfRenderTask.cancel(); } catch (_) { /* ignore */ }
+  }
+  pdfRenderTask = page.render(renderContext);
+  try {
+    await pdfRenderTask.promise;
+  } catch (_) {
+    // Ignorer les erreurs dues aux annulations
+  } finally {
+    pdfRenderTask = null;
+  }
   
   // Mettre à jour le style du canvas pour le scroll
   canvas.style.width = `${viewport.width}px`;

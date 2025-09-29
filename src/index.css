@@ -90,15 +90,18 @@ body {
   position: relative;
 }
 .viewer { background: #ffffff; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; }
-.viewer-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.viewer-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
 .viewer-pdf-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 8px; }
 .viewer-title { font-weight: 600; }
 .viewer-canvas { flex: 1; overflow: auto; overflow-y: auto; background: #f1f5f9; border-radius: 8px; display: grid; place-items: center; }
+.viewer-nav > div { min-width: 0; }
+#zoom-controls { display: none; gap: 4px; flex-wrap: wrap; }
+#zoom-controls button { flex: 0 0 auto; }
 .viewer-canvas .excel-container { place-self: stretch; }
 .viewer-canvas img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .viewer-canvas canvas { 
-  max-width: none; 
-  max-height: none; 
+  max-width: 100%; 
+  max-height: 100%; 
   width: auto; 
   height: auto; 
   display: block; 
