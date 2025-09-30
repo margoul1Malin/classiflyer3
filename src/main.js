@@ -808,13 +808,57 @@ function registerIpcHandlers() {
     // Handle rename (filesystem move) if name changed
     if (typeof updates?.name === 'string' && updates.name.trim() && updates.name !== current.name) {
       const rootPath = db.settings && db.settings.rootPath ? db.settings.rootPath : getDefaultRootPath();
-      const newDir = path.join(rootPath, 'classeurs', updates.name.trim());
+      
+      // Déterminer le chemin en fonction du classeurFolderId
+      let newDir;
+      let newAppPath;
+      if (current.classeurFolderId && db.mes_classeurs?.folders?.[current.classeurFolderId]) {
+        const folder = db.mes_classeurs.folders[current.classeurFolderId];
+        newDir = path.join(folder.sys_path, updates.name.trim());
+        newAppPath = `${folder.app_path}/${updates.name.trim()}`;
+      } else {
+        newDir = path.join(rootPath, 'classeurs', updates.name.trim());
+        newAppPath = `/mes_classeurs/${updates.name.trim()}`;
+      }
+      
+      const oldDir = current.sys_path;
+      
       await fsp.mkdir(path.dirname(newDir), { recursive: true });
       try {
         await renameWithRetry(current.sys_path, newDir);
         next.sys_path = newDir;
-        next.app_path = `/mes_classeurs/${updates.name.trim()}`;
+        next.app_path = newAppPath;
         next.name = updates.name.trim();
+        
+        // Fonction récursive pour mettre à jour tous les chemins imbriqués
+        function updateNestedPaths(folders, files, oldBasePath, newBasePath) {
+          if (folders) {
+            for (const [folderId, folder] of Object.entries(folders)) {
+              if (folder.sys_path && folder.sys_path.startsWith(oldBasePath)) {
+                folder.sys_path = folder.sys_path.replace(oldBasePath, newBasePath);
+                updateNestedPaths(folder.folders, folder.files, oldBasePath, newBasePath);
+              }
+            }
+          }
+          if (files) {
+            if (Array.isArray(files)) {
+              for (const file of files) {
+                if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+                  file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+                }
+              }
+            } else {
+              for (const [fileId, file] of Object.entries(files)) {
+                if (file.sys_path && file.sys_path.startsWith(oldBasePath)) {
+                  file.sys_path = file.sys_path.replace(oldBasePath, newBasePath);
+                }
+              }
+            }
+          }
+        }
+        
+        // Mettre à jour tous les chemins des dossiers et fichiers du classeur
+        updateNestedPaths(next.folders, next.files, oldDir, newDir);
       } catch (e) {
         throw new Error('Échec du renommage du dossier du classeur');
       }
