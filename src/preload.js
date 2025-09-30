@@ -22,6 +22,12 @@ contextBridge.exposeInMainWorld('classiflyer', {
   updateClasseur: async (id, updates) => ipcRenderer.invoke('classeurs:update', id, updates),
   deleteClasseur: async (id) => ipcRenderer.invoke('classeurs:delete', id),
   archiveClasseur: async (id, archiveFolderId = null) => ipcRenderer.invoke('classeurs:archive', id, archiveFolderId),
+  // Dossiers de Classeurs API
+  listClasseurFolders: async () => ipcRenderer.invoke('classeurFolders:list'),
+  createClasseurFolder: async (name) => ipcRenderer.invoke('classeurFolders:create', name),
+  renameClasseurFolder: async (folderId, newName) => ipcRenderer.invoke('classeurFolders:rename', folderId, newName),
+  deleteClasseurFolder: async (folderId) => ipcRenderer.invoke('classeurFolders:delete', folderId),
+  moveClasseurToFolder: async (classeurId, folderId = null) => ipcRenderer.invoke('classeurFolders:moveClasseur', classeurId, folderId),
   // Classeur FS ops
   getClasseur: async (id) => ipcRenderer.invoke('classeur:get', id),
   createFolder: async (id, name, parentFolderId = null) => ipcRenderer.invoke('classeur:createFolder', id, name, parentFolderId),
@@ -43,6 +49,8 @@ contextBridge.exposeInMainWorld('classiflyer', {
   trashMoveClasseur: async (id, context) => ipcRenderer.invoke('trash:moveClasseur', id, context), // context: 'mes' | 'archives'
   trashRestoreClasseur: async (id) => ipcRenderer.invoke('trash:restoreClasseur', id),
   trashDeleteClasseur: async (id) => ipcRenderer.invoke('trash:deleteClasseur', id),
+  trashRestoreClasseurFolder: async (id) => ipcRenderer.invoke('trash:restoreClasseurFolder', id),
+  trashDeleteClasseurFolder: async (id) => ipcRenderer.invoke('trash:deleteClasseurFolder', id),
   trashClearAll: async () => ipcRenderer.invoke('trash:clearAll'),
   // Utilitaires
   toFileUrl: (absolutePath) => {

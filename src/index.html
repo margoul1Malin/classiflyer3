@@ -22,11 +22,24 @@
         <div class="toolbar">
           <h1>Mes Classeurs</h1>
           <div class="toolbar-actions">
-            <input id="search-classeurs" type="search" placeholder="Rechercher un classeur…" />
+            <input id="search-classeurs" type="search" placeholder="Rechercher…" />
+            <button id="btn-create-classeur-folder" class="btn">📁 Nouveau dossier</button>
             <button id="btn-create-classeur" class="btn primary">Créer un classeur</button>
           </div>
         </div>
         <div id="classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
+      </section>
+      <section id="view-classeur-folder" class="view" role="region" aria-label="Dossier de classeurs">
+        <div class="toolbar">
+          <button id="btn-back-to-classeurs" class="btn" style="margin-bottom: 12px;">
+            ← Retour à Mes Classeurs
+          </button>
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <h1 id="folder-view-title">Dossier</h1>
+            <input id="search-in-folder" type="search" placeholder="Rechercher dans ce dossier…" style="width: 300px;" />
+          </div>
+        </div>
+        <div id="folder-classeurs-grid" class="cards-grid grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-8 p-4 md:p-6" aria-live="polite"></div>
       </section>
       <section id="view-classeur" class="view" role="region" aria-label="Classeur">
         <div class="classeur-header">
@@ -648,6 +661,48 @@ C:\Users\[user]\AppData\Roaming\Classiflyer\config\  (Windows)
         <div class="modal-footer">
           <button id="confirm-cancel" class="btn">Annuler</button>
           <button id="confirm-ok" class="btn primary">Confirmer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal pour créer un dossier de classeur -->
+    <div id="modal-create-classeur-folder" class="modal" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>Nouveau dossier de classeurs</h2>
+          <button id="close-classeur-folder-modal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="classeur-folder-name">Nom du dossier :</label>
+            <input id="classeur-folder-name" type="text" placeholder="Ex: Projets 2025" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-classeur-folder" class="btn">Annuler</button>
+          <button id="create-classeur-folder" class="btn primary">Créer</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal pour renommer un dossier de classeur -->
+    <div id="modal-rename-classeur-folder" class="modal" aria-hidden="true">
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <h2>Renommer le dossier</h2>
+          <button id="close-rename-classeur-folder-modal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-col">
+            <label for="rename-classeur-folder-name">Nouveau nom :</label>
+            <input id="rename-classeur-folder-name" type="text" placeholder="Nouveau nom du dossier" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="cancel-rename-classeur-folder" class="btn">Annuler</button>
+          <button id="confirm-rename-classeur-folder" class="btn primary">Renommer</button>
         </div>
       </div>
     </div>

@@ -158,15 +158,21 @@ function initSettingsView() {
 function initClasseursView() {
   const grid = document.getElementById('classeurs-grid');
   const btnCreate = document.getElementById('btn-create-classeur');
+  const btnCreateFolder = document.getElementById('btn-create-classeur-folder');
   const searchInput = document.getElementById('search-classeurs');
-  if (!grid || !btnCreate) return;
+  if (!grid || !btnCreate || !btnCreateFolder) return;
 
   async function refresh() {
     if (!window.classiflyer || typeof window.classiflyer.listClasseurs !== 'function') return;
-    const list = await window.classiflyer.listClasseurs();
+    const classeurs = await window.classiflyer.listClasseurs();
+    const folders = await window.classiflyer.listClasseurFolders();
     const q = (searchInput instanceof HTMLInputElement ? searchInput.value.trim().toLowerCase() : '');
-    const filtered = q ? list.filter((c) => (c.name || '').toLowerCase().includes(q)) : list;
-    renderClasseurs(grid, filtered);
+    
+    // Filtrer classeurs et dossiers selon la recherche
+    const filteredClasseurs = q ? classeurs.filter((c) => (c.name || '').toLowerCase().includes(q)) : classeurs;
+    const filteredFolders = q ? folders.filter((f) => (f.name || '').toLowerCase().includes(q)) : folders;
+    
+    renderClasseursAndFolders(grid, filteredClasseurs, filteredFolders, refresh);
   }
 
   btnCreate.addEventListener('click', () => {
@@ -176,11 +182,18 @@ function initClasseursView() {
     });
   });
 
+  btnCreateFolder.addEventListener('click', () => {
+    openCreateClasseurFolderModal(refresh);
+  });
+
   if (searchInput instanceof HTMLInputElement) {
     searchInput.addEventListener('input', refresh);
   }
 
-  refresh();
+  refresh().then(() => {
+    // Initialiser le drag & drop après le rendu initial
+    initClasseurFoldersDragDrop();
+  });
 }
 
 function openCreateChoiceModal({ onBlank, onFromFolder }) {
@@ -299,99 +312,352 @@ function openCreateFromFolderModal(onCreated) {
     }
   }, { once:true });
 }
-function renderClasseurs(container, classeurs) {
+// Nouvelle fonction pour afficher à la fois dossiers et classeurs
+function renderClasseursAndFolders(container, classeurs, folders, refreshCallback) {
   container.innerHTML = '';
-  for (const item of classeurs) {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.style.background = item.primaryColor || '#ffffff';
-    card.style.borderRight = `8px solid ${item.secondaryColor || '#000000'}`;
-
-    const title = document.createElement('div');
-    title.className = 'card-title';
-    title.textContent = item.name;
-    // Force text color on title to ensure no CSS override
-    title.style.color = item.tertiaryColor || '#0b1220';
-
-    // Compter les fichiers et dossiers
-    const fileCount = countClasseurContent(item);
-    const counter = document.createElement('div');
-    counter.className = 'classeur-counter';
-    counter.textContent = `${fileCount.files} fichier${fileCount.files > 1 ? 's' : ''}, ${fileCount.folders} dossier${fileCount.folders > 1 ? 's' : ''}`;
-    counter.style.color = item.tertiaryColor || '#0b1220';
-    counter.style.fontSize = '12px';
-    counter.style.position = 'absolute';
-    counter.style.bottom = '8px';
-    counter.style.left = '8px';
-    counter.style.opacity = '0.8';
-
-    const menuBtn = document.createElement('button');
-    menuBtn.className = 'btn card-menu-btn';
-    menuBtn.textContent = '⋯';
-
-    const menu = document.createElement('div');
-    menu.className = 'menu';
-
-    const editItem = document.createElement('div');
-    editItem.className = 'menu-item';
-    editItem.textContent = 'Modifier';
-    editItem.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      openEditModal(item, async () => {
-        const l = await window.classiflyer.listClasseurs();
-        renderClasseurs(container, l);
-      });
-      menu.classList.remove('is-open');
-    });
-
-    const deleteItem = document.createElement('div');
-    deleteItem.className = 'menu-item';
-    deleteItem.textContent = 'Supprimer';
-    deleteItem.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (await showConfirmModal('Confirmation', 'Envoyer ce classeur à la corbeille ?')) {
-        try {
-          await window.classiflyer.trashMoveClasseur(item.id, 'mes');
-        await window.classiflyer.listClasseurs().then((l) => renderClasseurs(container, l));
-        } catch (err) {
-          alert('Erreur: ' + (err?.message || 'Impossible de déplacer vers corbeille'));
-        }
-      }
-      menu.classList.remove('is-open');
-    });
-
-    const archiveItem = document.createElement('div');
-    archiveItem.className = 'menu-item';
-    archiveItem.textContent = 'Archiver';
-    archiveItem.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      menu.classList.remove('is-open');
-      await showArchiveDestinationModal(item.id, container);
-    });
-
-    menu.appendChild(editItem);
-    menu.appendChild(deleteItem);
-    menu.appendChild(archiveItem);
-
-    menuBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = menu.classList.contains('is-open');
-      document.querySelectorAll('.menu.is-open').forEach((el) => el.classList.remove('is-open'));
-      if (!isOpen) menu.classList.add('is-open');
-    });
-
-    document.addEventListener('click', () => menu.classList.remove('is-open'));
-
-    card.appendChild(title);
-    card.appendChild(counter);
-    card.appendChild(menuBtn);
-    card.appendChild(menu);
-
-    // Click to open classeur page
-    card.addEventListener('click', () => openClasseurView(item.id));
-
+  
+  // D'abord afficher les dossiers
+  for (const folder of folders) {
+    const folderCard = createFolderCard(folder, classeurs, refreshCallback);
+    container.appendChild(folderCard);
+  }
+  
+  // Ensuite afficher les classeurs à la racine (sans classeurFolderId)
+  const rootClasseurs = classeurs.filter(c => !c.classeurFolderId);
+  for (const item of rootClasseurs) {
+    const card = createClasseurCard(item, refreshCallback);
     container.appendChild(card);
   }
+}
+
+// Créer une carte de dossier
+function createFolderCard(folder, allClasseurs, refreshCallback) {
+  const folderCard = document.createElement('div');
+  folderCard.className = 'classeur-folder-card';
+  folderCard.dataset.folderId = folder.id;
+  
+  // Compter les classeurs dans ce dossier
+  const classeursCount = allClasseurs.filter(c => c.classeurFolderId === folder.id).length;
+  
+  const icon = document.createElement('div');
+  icon.className = 'folder-icon';
+  icon.textContent = '📁';
+  
+  const title = document.createElement('div');
+  title.className = 'folder-title';
+  title.textContent = folder.name;
+  
+  const count = document.createElement('div');
+  count.className = 'folder-count';
+  count.textContent = `${classeursCount} classeur${classeursCount > 1 ? 's' : ''}`;
+  
+  const menuBtn = document.createElement('button');
+  menuBtn.className = 'btn folder-menu-btn';
+  menuBtn.textContent = '⋯';
+  
+  const menu = document.createElement('div');
+  menu.className = 'menu';
+  
+  const renameItem = document.createElement('div');
+  renameItem.className = 'menu-item';
+  renameItem.textContent = 'Renommer';
+  renameItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    openRenameClasseurFolderModal(folder, refreshCallback);
+    menu.classList.remove('is-open');
+  });
+  
+  const deleteItem = document.createElement('div');
+  deleteItem.className = 'menu-item';
+  deleteItem.textContent = 'Supprimer';
+  deleteItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (await showConfirmModal('Confirmation', `Envoyer ce dossier et ses ${classeursCount} classeur(s) à la corbeille ?`)) {
+      try {
+        await window.classiflyer.deleteClasseurFolder(folder.id);
+        await refreshCallback();
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Impossible de supprimer le dossier'));
+      }
+    }
+    menu.classList.remove('is-open');
+  });
+  
+  menu.appendChild(renameItem);
+  menu.appendChild(deleteItem);
+  
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = menu.classList.contains('is-open');
+    document.querySelectorAll('.menu.is-open').forEach((el) => el.classList.remove('is-open'));
+    if (!isOpen) menu.classList.add('is-open');
+  });
+  
+  document.addEventListener('click', () => menu.classList.remove('is-open'));
+  
+  folderCard.appendChild(icon);
+  folderCard.appendChild(title);
+  folderCard.appendChild(count);
+  folderCard.appendChild(menuBtn);
+  folderCard.appendChild(menu);
+  
+  // Clic pour ouvrir le dossier
+  folderCard.addEventListener('click', (e) => {
+    // Ne pas ouvrir si on clique sur le menu
+    if (e.target.closest('.folder-menu-btn') || e.target.closest('.menu')) {
+      return;
+    }
+    openFolderView(folder);
+  });
+  
+  return folderCard;
+}
+
+// Ouvrir la vue d'un dossier
+let currentFolderId = null;
+async function openFolderView(folder) {
+  currentFolderId = folder.id;
+  selectView('view-classeur-folder');
+  
+  const titleEl = document.getElementById('folder-view-title');
+  if (titleEl) titleEl.textContent = folder.name;
+  
+  const backBtn = document.getElementById('btn-back-to-classeurs');
+  if (backBtn) {
+    backBtn.onclick = () => {
+      selectView('view-classeurs');
+      currentFolderId = null;
+    };
+  }
+  
+  // Charger les classeurs du dossier
+  await refreshFolderView(folder.id);
+  
+  // Recherche dans le dossier
+  const searchInput = document.getElementById('search-in-folder');
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.value = '';
+    searchInput.onkeyup = () => refreshFolderView(folder.id, searchInput.value);
+  }
+}
+
+async function refreshFolderView(folderId, searchTerm = '') {
+  const grid = document.getElementById('folder-classeurs-grid');
+  if (!grid) return;
+  
+  const allClasseurs = await window.classiflyer.listClasseurs();
+  const classeursInFolder = allClasseurs.filter(c => c.classeurFolderId === folderId);
+  
+  const q = searchTerm.trim().toLowerCase();
+  const filtered = q ? classeursInFolder.filter((c) => (c.name || '').toLowerCase().includes(q)) : classeursInFolder;
+  
+  grid.innerHTML = '';
+  
+  if (filtered.length === 0) {
+    const emptyMsg = document.createElement('div');
+    emptyMsg.style.cssText = 'grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b; font-size: 16px;';
+    emptyMsg.textContent = searchTerm ? 'Aucun classeur trouvé' : 'Ce dossier est vide';
+    grid.appendChild(emptyMsg);
+  } else {
+    for (const classeur of filtered) {
+      const card = createClasseurCard(classeur, async () => {
+        try {
+          await refreshFolderView(folderId, searchTerm);
+        } catch (err) {
+          console.error('Erreur lors du rafraîchissement de la vue du dossier:', err);
+          // Si le dossier n'existe plus ou autre erreur, retourner à Mes Classeurs
+          selectView('view-classeurs');
+          const grid = document.getElementById('classeurs-grid');
+          
+          async function refreshMainView() {
+            const classeurs = await window.classiflyer.listClasseurs();
+            const folders = await window.classiflyer.listClasseurFolders();
+            renderClasseursAndFolders(grid, classeurs, folders, refreshMainView);
+          }
+          
+          await refreshMainView();
+          setTimeout(() => initClasseurFoldersDragDrop(), 100);
+        }
+      });
+      grid.appendChild(card);
+    }
+  }
+  
+  // Activer le drag & drop dans la vue du dossier
+  setTimeout(() => initFolderViewDragDrop(), 100);
+}
+
+// Drag & drop dans la vue d'un dossier (pour sortir des classeurs du dossier)
+function initFolderViewDragDrop() {
+  const folderGrid = document.getElementById('folder-classeurs-grid');
+  if (!folderGrid) return;
+  
+  folderGrid.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.card-menu-btn') || e.target.closest('.menu')) {
+      return;
+    }
+
+    const card = e.target.closest('.card.drag-ready');
+    if (!card) return;
+
+    const classeurId = card.dataset.classeurId;
+    if (!classeurId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    let isDragging = false;
+    let startX = e.clientX;
+    let startY = e.clientY;
+    let dragThreshold = 8;
+
+    document.body.style.userSelect = 'none';
+
+    const handleMouseMove = (e) => {
+      e.preventDefault();
+      const deltaX = Math.abs(e.clientX - startX);
+      const deltaY = Math.abs(e.clientY - startY);
+      
+      if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+        isDragging = true;
+        card.classList.add('dragging');
+        card.style.position = 'fixed';
+        card.style.zIndex = '9999';
+        card.style.pointerEvents = 'none';
+        document.body.style.cursor = 'grabbing';
+      }
+
+      if (isDragging) {
+        card.style.left = (e.clientX - 100) + 'px';
+        card.style.top = (e.clientY - 150) + 'px';
+      }
+    };
+
+    const handleMouseUp = async (e) => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+
+      if (isDragging) {
+        card.classList.remove('dragging');
+        card.style.position = '';
+        card.style.zIndex = '';
+        card.style.left = '';
+        card.style.top = '';
+        card.style.pointerEvents = '';
+
+        try {
+          // Dans la vue d'un dossier, on peut seulement sortir le classeur (le remettre à la racine)
+          await window.classiflyer.moveClasseurToFolder(classeurId, null);
+          await refreshFolderView(currentFolderId);
+        } catch (err) {
+          console.error('Erreur de déplacement:', err);
+          if (!err.message.includes('ENOENT')) {
+            alert('Erreur: ' + (err?.message || 'Impossible de sortir le classeur'));
+          }
+        }
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  });
+}
+
+// Créer une carte de classeur
+function createClasseurCard(item, refreshCallback) {
+  const card = document.createElement('div');
+  card.className = 'card drag-ready';
+  card.style.background = item.primaryColor || '#ffffff';
+  card.style.borderRight = `8px solid ${item.secondaryColor || '#000000'}`;
+  card.dataset.classeurId = item.id;
+
+  const title = document.createElement('div');
+  title.className = 'card-title';
+  title.textContent = item.name;
+  title.style.color = item.tertiaryColor || '#0b1220';
+
+  const fileCount = countClasseurContent(item);
+  const counter = document.createElement('div');
+  counter.className = 'classeur-counter';
+  counter.textContent = `${fileCount.files} fichier${fileCount.files > 1 ? 's' : ''}, ${fileCount.folders} dossier${fileCount.folders > 1 ? 's' : ''}`;
+  counter.style.color = item.tertiaryColor || '#0b1220';
+  counter.style.fontSize = '12px';
+  counter.style.position = 'absolute';
+  counter.style.bottom = '8px';
+  counter.style.left = '8px';
+  counter.style.opacity = '0.8';
+
+  const menuBtn = document.createElement('button');
+  menuBtn.className = 'btn card-menu-btn';
+  menuBtn.textContent = '⋯';
+
+  const menu = document.createElement('div');
+  menu.className = 'menu';
+
+  const editItem = document.createElement('div');
+  editItem.className = 'menu-item';
+  editItem.textContent = 'Modifier';
+  editItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    openEditModal(item, refreshCallback);
+    menu.classList.remove('is-open');
+  });
+
+  const deleteItem = document.createElement('div');
+  deleteItem.className = 'menu-item';
+  deleteItem.textContent = 'Supprimer';
+  deleteItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (await showConfirmModal('Confirmation', 'Envoyer ce classeur à la corbeille ?')) {
+      try {
+        await window.classiflyer.trashMoveClasseur(item.id, 'mes');
+        await refreshCallback();
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Impossible de déplacer vers corbeille'));
+      }
+    }
+    menu.classList.remove('is-open');
+  });
+
+  const archiveItem = document.createElement('div');
+  archiveItem.className = 'menu-item';
+  archiveItem.textContent = 'Archiver';
+  archiveItem.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    menu.classList.remove('is-open');
+    await showArchiveDestinationModal(item.id, async () => {
+      try {
+        await refreshCallback();
+      } catch (err) {
+        console.error('Erreur lors du rafraîchissement après archivage:', err);
+      }
+    });
+  });
+
+  menu.appendChild(editItem);
+  menu.appendChild(deleteItem);
+  menu.appendChild(archiveItem);
+
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = menu.classList.contains('is-open');
+    document.querySelectorAll('.menu.is-open').forEach((el) => el.classList.remove('is-open'));
+    if (!isOpen) menu.classList.add('is-open');
+  });
+
+  document.addEventListener('click', () => menu.classList.remove('is-open'));
+
+  card.appendChild(title);
+  card.appendChild(counter);
+  card.appendChild(menuBtn);
+  card.appendChild(menu);
+
+  // Click to open classeur page
+  card.addEventListener('click', () => openClasseurView(item.id));
+
+  return card;
 }
 
 function openCreateModal(onCreated) {
@@ -2999,10 +3265,109 @@ function initTrashView() {
   if (view.classList.contains('is-visible')) refresh();
 }
 
+// Créer une carte de dossier dans la corbeille
+function createTrashFolderCard(folder, container) {
+  const card = document.createElement('div');
+  card.className = 'trash-folder-card';
+  
+  const icon = document.createElement('div');
+  icon.className = 'folder-icon';
+  icon.textContent = '🗑️📁';
+  
+  const title = document.createElement('div');
+  title.className = 'folder-title';
+  title.textContent = folder.name || '(Sans nom)';
+  
+  const count = document.createElement('div');
+  count.className = 'folder-count';
+  const nbClasseurs = folder.classeurs ? folder.classeurs.length : 0;
+  count.textContent = `${nbClasseurs} classeur${nbClasseurs > 1 ? 's' : ''}`;
+  
+  // Informations de suppression
+  const metaInfo = document.createElement('div');
+  metaInfo.style.fontSize = '11px';
+  metaInfo.style.color = '#dc2626';
+  metaInfo.style.opacity = '0.8';
+  metaInfo.style.textAlign = 'center';
+  const from = folder.deletedFrom === 'archives' ? 'Archives' : 'Mes Classeurs';
+  const when = folder.deletedAt ? new Date(folder.deletedAt).toLocaleString('fr-FR', { 
+    dateStyle: 'short', 
+    timeStyle: 'short' 
+  }) : '';
+  metaInfo.innerHTML = `<div>Supprimé le ${when}</div>`;
+  
+  const actions = document.createElement('div');
+  actions.className = 'trash-actions';
+  
+  const restoreBtn = document.createElement('button');
+  restoreBtn.className = 'btn';
+  restoreBtn.textContent = '♻️ Restaurer';
+  restoreBtn.style.background = '#22c55e';
+  restoreBtn.style.color = 'white';
+  restoreBtn.style.border = 'none';
+  restoreBtn.style.fontSize = '12px';
+  restoreBtn.style.padding = '6px 12px';
+  restoreBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (await showConfirmModal('Confirmation', `Restaurer ce dossier et ses ${nbClasseurs} classeur(s) ?`)) {
+      try {
+        await window.classiflyer.trashRestoreClasseurFolder(folder.id);
+        // Rafraîchir la corbeille
+        const items = await window.classiflyer.trashList();
+        renderTrash(container, items);
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Impossible de restaurer le dossier'));
+      }
+    }
+  });
+  
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'btn';
+  deleteBtn.textContent = '🗑️ Supprimer';
+  deleteBtn.style.background = '#dc2626';
+  deleteBtn.style.color = 'white';
+  deleteBtn.style.border = 'none';
+  deleteBtn.style.fontSize = '12px';
+  deleteBtn.style.padding = '6px 12px';
+  deleteBtn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (await showConfirmModal('Confirmation', `Supprimer DÉFINITIVEMENT ce dossier et ses ${nbClasseurs} classeur(s) ? Cette action est irréversible.`)) {
+      try {
+        await window.classiflyer.trashDeleteClasseurFolder(folder.id);
+        // Rafraîchir la corbeille
+        const items = await window.classiflyer.trashList();
+        renderTrash(container, items);
+      } catch (err) {
+        alert('Erreur: ' + (err?.message || 'Impossible de supprimer le dossier'));
+      }
+    }
+  });
+  
+  actions.appendChild(restoreBtn);
+  actions.appendChild(deleteBtn);
+  
+  card.appendChild(icon);
+  card.appendChild(title);
+  card.appendChild(count);
+  card.appendChild(metaInfo);
+  card.appendChild(actions);
+  
+  return card;
+}
+
 function renderTrash(container, items) {
   if (!container) return;
   container.innerHTML = '';
   for (const it of items) {
+    // Vérifier si c'est un dossier ou un classeur
+    if (it.type === 'classeur_folder') {
+      // Créer une carte de dossier dans la corbeille
+      const card = createTrashFolderCard(it, container);
+      container.appendChild(card);
+      continue;
+    }
+    
+    // Sinon, c'est un classeur normal
     const card = document.createElement('div');
     card.className = 'card';
     card.style.background = it.primaryColor || '#ffffff';
@@ -3832,7 +4197,258 @@ function initArchiveTreeResize() {
 
 // ===== MODALE DE DESTINATION D'ARCHIVAGE =====
 
-async function showArchiveDestinationModal(classeurId, container) {
+// ===== Fonctions pour les dossiers de classeurs =====
+
+function openCreateClasseurFolderModal(refreshCallback) {
+  const modal = document.getElementById('modal-create-classeur-folder');
+  const input = document.getElementById('classeur-folder-name');
+  const createBtn = document.getElementById('create-classeur-folder');
+  const cancelBtn = document.getElementById('cancel-classeur-folder');
+  const closeBtn = document.getElementById('close-classeur-folder-modal');
+  
+  if (!modal || !input) return;
+  
+  modal.setAttribute('aria-hidden', 'false');
+  input.value = '';
+  input.focus();
+  
+  const close = () => modal.setAttribute('aria-hidden', 'true');
+  
+  const handleCreate = async () => {
+    const name = input.value.trim();
+    if (!name) return;
+    try {
+      await window.classiflyer.createClasseurFolder(name);
+      close();
+      await refreshCallback();
+    } catch (err) {
+      alert('Erreur: ' + (err?.message || 'Impossible de créer le dossier'));
+    }
+  };
+  
+  createBtn.addEventListener('click', handleCreate, { once: true });
+  cancelBtn.addEventListener('click', close, { once: true });
+  closeBtn.addEventListener('click', close, { once: true });
+  modal.querySelector('.modal-backdrop')?.addEventListener('click', close, { once: true });
+}
+
+function openRenameClasseurFolderModal(folder, refreshCallback) {
+  const modal = document.getElementById('modal-rename-classeur-folder');
+  const input = document.getElementById('rename-classeur-folder-name');
+  const confirmBtn = document.getElementById('confirm-rename-classeur-folder');
+  const cancelBtn = document.getElementById('cancel-rename-classeur-folder');
+  const closeBtn = document.getElementById('close-rename-classeur-folder-modal');
+  
+  if (!modal || !input) return;
+  
+  modal.setAttribute('aria-hidden', 'false');
+  input.value = folder.name;
+  input.select();
+  input.focus();
+  
+  const close = () => modal.setAttribute('aria-hidden', 'true');
+  
+  const handleRename = async () => {
+    const newName = input.value.trim();
+    if (!newName || newName === folder.name) {
+      close();
+      return;
+    }
+    try {
+      await window.classiflyer.renameClasseurFolder(folder.id, newName);
+      close();
+      await refreshCallback();
+    } catch (err) {
+      alert('Erreur: ' + (err?.message || 'Impossible de renommer le dossier'));
+    }
+  };
+  
+  confirmBtn.addEventListener('click', handleRename, { once: true });
+  cancelBtn.addEventListener('click', close, { once: true });
+  closeBtn.addEventListener('click', close, { once: true });
+  modal.querySelector('.modal-backdrop')?.addEventListener('click', close, { once: true });
+}
+
+// ===== DRAG & DROP DANS MES CLASSEURS =====
+
+function initClasseurFoldersDragDrop() {
+  const classeursGrid = document.getElementById('classeurs-grid');
+  
+  if (!classeursGrid) {
+    console.error('Grid des classeurs introuvable pour le drag & drop');
+    return;
+  }
+
+  // Rendre les classeurs draggables
+  classeursGrid.addEventListener('mousedown', (e) => {
+    // Ignorer si c'est un clic sur le menu ou un dossier
+    if (e.target.closest('.card-menu-btn') || 
+        e.target.closest('.menu') || 
+        e.target.closest('.folder-menu-btn') ||
+        e.target.closest('.classeur-folder-card')) {
+      return;
+    }
+
+    const card = e.target.closest('.card.drag-ready');
+    if (!card) return;
+
+    const classeurId = card.dataset.classeurId;
+    if (!classeurId) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    let isDragging = false;
+    let startX = e.clientX;
+    let startY = e.clientY;
+    let dragThreshold = 8;
+
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
+
+    const handleMouseMove = (e) => {
+      e.preventDefault();
+      const deltaX = Math.abs(e.clientX - startX);
+      const deltaY = Math.abs(e.clientY - startY);
+      
+      if (!isDragging && (deltaX > dragThreshold || deltaY > dragThreshold)) {
+        isDragging = true;
+        console.log('Début du drag pour classeur:', classeurId);
+        
+        card.classList.add('dragging');
+        card.style.position = 'fixed';
+        card.style.zIndex = '9999';
+        card.style.pointerEvents = 'none';
+        document.body.style.cursor = 'grabbing';
+        
+        // Activer les drop targets
+        const folders = document.querySelectorAll('.classeur-folder-card');
+        folders.forEach(folder => {
+          folder.classList.add('drop-target');
+          folder.style.pointerEvents = 'auto';
+        });
+      }
+
+      if (isDragging) {
+        card.style.left = (e.clientX - 100) + 'px';
+        card.style.top = (e.clientY - 150) + 'px';
+      }
+    };
+
+    const handleMouseUp = async (e) => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+
+      document.body.style.userSelect = '';
+      document.body.style.webkitUserSelect = '';
+      document.body.style.cursor = '';
+
+      if (isDragging) {
+        console.log('Fin du drag');
+        
+        card.classList.remove('dragging');
+        card.style.position = '';
+        card.style.zIndex = '';
+        card.style.left = '';
+        card.style.top = '';
+        card.style.pointerEvents = '';
+
+        // Retirer les indicateurs de drop
+        const folders = document.querySelectorAll('.classeur-folder-card');
+        folders.forEach(folder => {
+          folder.classList.remove('drop-target');
+          folder.classList.remove('drag-over');
+          folder.style.pointerEvents = '';
+        });
+
+        // Trouver le folder sous la souris
+        const elementUnderMouse = document.elementFromPoint(e.clientX, e.clientY);
+        const targetFolder = elementUnderMouse?.closest('.classeur-folder-card');
+        
+        // Vérifier quelle vue est active
+        const isInFolderView = document.getElementById('view-classeur-folder')?.classList.contains('is-visible');
+        const isInMainView = document.getElementById('view-classeurs')?.classList.contains('is-visible');
+        
+        let needsMove = false;
+        let targetFolderId = null;
+        
+        if (targetFolder) {
+          // Déplacer vers un dossier
+          targetFolderId = targetFolder.dataset.folderId;
+          needsMove = true;
+          console.log('Déplacement du classeur', classeurId, 'vers le dossier', targetFolderId);
+        } else if (isInMainView && !targetFolder) {
+          // Si dans la vue principale et drop sur zone vide -> déplacer à la racine
+          targetFolderId = null;
+          needsMove = true;
+          console.log('Déplacement du classeur', classeurId, 'vers la racine');
+        }
+        
+        if (needsMove) {
+          try {
+            await window.classiflyer.moveClasseurToFolder(classeurId, targetFolderId);
+            
+            // Rafraîchir selon la vue active
+            if (isInFolderView && currentFolderId) {
+              await refreshFolderView(currentFolderId);
+            } else {
+              const grid = document.getElementById('classeurs-grid');
+              const searchInput = document.getElementById('search-classeurs');
+              
+              async function refreshView() {
+                const classeurs = await window.classiflyer.listClasseurs();
+                const folders = await window.classiflyer.listClasseurFolders();
+                const q = (searchInput instanceof HTMLInputElement ? searchInput.value.trim().toLowerCase() : '');
+                const filteredClasseurs = q ? classeurs.filter((c) => (c.name || '').toLowerCase().includes(q)) : classeurs;
+                const filteredFolders = q ? folders.filter((f) => (f.name || '').toLowerCase().includes(q)) : folders;
+                renderClasseursAndFolders(grid, filteredClasseurs, filteredFolders, refreshView);
+              }
+              
+              await refreshView();
+              // Réinitialiser le drag & drop après le rafraîchissement
+              setTimeout(() => initClasseurFoldersDragDrop(), 100);
+            }
+          } catch (err) {
+            console.error('Erreur de déplacement:', err);
+            // Ne pas afficher d'alerte si le déplacement a réussi malgré l'erreur
+            if (!err.message.includes('ENOENT')) {
+              alert('Erreur: ' + (err?.message || 'Impossible de déplacer le classeur'));
+            }
+          }
+        }
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  });
+
+  // Gérer le survol des dossiers pendant le drag
+  classeursGrid.addEventListener('mouseover', (e) => {
+    if (document.querySelector('.card.dragging')) {
+      const folderCard = e.target.closest('.classeur-folder-card');
+      if (folderCard) {
+        document.querySelectorAll('.drag-over').forEach(item => 
+          item.classList.remove('drag-over')
+        );
+        folderCard.classList.add('drag-over');
+      }
+    }
+  });
+
+  classeursGrid.addEventListener('mouseout', (e) => {
+    if (document.querySelector('.card.dragging')) {
+      const folderCard = e.target.closest('.classeur-folder-card');
+      if (folderCard && !folderCard.contains(e.relatedTarget)) {
+        folderCard.classList.remove('drag-over');
+      }
+    }
+  });
+
+  console.log('Drag & drop des classeurs folders initialisé');
+}
+
+async function showArchiveDestinationModal(classeurId, refreshCallback) {
   const modal = document.getElementById('modal-archive-destination');
   const tree = document.getElementById('archive-destination-tree');
   const confirmBtn = document.getElementById('confirm-archive-destination');
@@ -3874,8 +4490,17 @@ async function showArchiveDestinationModal(classeurId, container) {
     try {
       const targetFolderId = selectedFolderId === 'root' ? null : selectedFolderId;
       await window.classiflyer.archiveClasseur(classeurId, targetFolderId);
-      await window.classiflyer.listClasseurs().then((l) => renderClasseurs(container, l));
       modal.setAttribute('aria-hidden', 'true');
+      
+      // Appeler le callback de rafraîchissement si fourni
+      if (typeof refreshCallback === 'function') {
+        try {
+          await refreshCallback();
+        } catch (err) {
+          console.error('Erreur lors du rafraîchissement:', err);
+          // Ignorer l'erreur de rafraîchissement, le classeur est archivé
+        }
+      }
     } catch (error) {
       console.error('Erreur lors de l\'archivage:', error);
       alert('Erreur lors de l\'archivage du classeur');
