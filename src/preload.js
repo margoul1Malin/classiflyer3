@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('classiflyer', {
   uploadFiles: async (id, folderId, files) => ipcRenderer.invoke('classeur:uploadFiles', id, folderId, files),
   updateFolder: async (id, folderId, updates) => ipcRenderer.invoke('classeur:updateFolder', id, folderId, updates),
   deleteFolder: async (id, folderId) => ipcRenderer.invoke('classeur:deleteFolder', id, folderId),
+  moveFile: async (id, filePath, targetFolderId = null) => ipcRenderer.invoke('classeur:moveFile', id, filePath, targetFolderId),
   // Archives API
   listArchives: async () => ipcRenderer.invoke('archives:list'),
   unarchiveClasseur: async (id) => ipcRenderer.invoke('archives:unarchive', id),

@@ -208,6 +208,10 @@ function registerIpcHandlers() {
             mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
           } else if (['.odp'].includes(ext)) {
             mimeType = 'application/vnd.oasis.opendocument.presentation';
+          } else if (['.mp4', '.webm', '.ogg'].includes(ext)) {
+            if (ext === '.mp4') mimeType = 'video/mp4';
+            else if (ext === '.webm') mimeType = 'video/webm';
+            else if (ext === '.ogg') mimeType = 'video/ogg';
           }
           
           files[fileId] = {
@@ -413,7 +417,24 @@ function registerIpcHandlers() {
 
   async function writeDb(db) {
     const dbPath = await getDbPath();
-    await fsp.writeFile(dbPath, JSON.stringify(db, null, 2), 'utf-8');
+    const tempPath = dbPath + '.tmp';
+    
+    try {
+      // Écrire dans un fichier temporaire d'abord
+      await fsp.writeFile(tempPath, JSON.stringify(db, null, 2), 'utf-8');
+      
+      // Puis renommer atomiquement (évite la corruption)
+      await fsp.rename(tempPath, dbPath);
+    } catch (error) {
+      // Nettoyer le fichier temporaire en cas d'erreur
+      try {
+        await fsp.unlink(tempPath);
+      } catch (_) {
+        // Ignorer si le fichier temporaire n'existe pas
+      }
+      throw error;
+    }
+    
     return db;
   }
 
@@ -593,6 +614,10 @@ function registerIpcHandlers() {
           mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
         } else if (['.odp'].includes(ext)) {
           mimeType = 'application/vnd.oasis.opendocument.presentation';
+        } else if (['.mp4', '.webm', '.ogg'].includes(ext)) {
+          if (ext === '.mp4') mimeType = 'video/mp4';
+          else if (ext === '.webm') mimeType = 'video/webm';
+          else if (ext === '.ogg') mimeType = 'video/ogg';
         }
       }
       
@@ -611,6 +636,106 @@ function registerIpcHandlers() {
     cls.updatedAt = Date.now();
     await writeDb(db);
     return saved;
+  });
+
+  ipcMain.handle('classeur:moveFile', async (_e, idKey, filePath, targetFolderId = null) => {
+    const db = await readDb();
+    
+    // Chercher d'abord dans mes_classeurs
+    let cls = db.mes_classeurs?.classeurs?.[idKey];
+    let isArchive = false;
+    
+    // Si pas trouvé, chercher dans les archives
+    if (!cls) {
+      cls = db.archives?.classeurs?.[idKey];
+      isArchive = true;
+    }
+    
+    if (!cls) throw new Error('Classeur introuvable');
+    
+    // Fonction récursive pour trouver un dossier par son ID
+    function findFolderById(folders, folderId) {
+      if (!folders) return null;
+      
+      for (const [id, folder] of Object.entries(folders)) {
+        if (id === folderId) {
+          return folder;
+        }
+        
+        // Chercher récursivement dans les sous-dossiers
+        if (folder.folders) {
+          const found = findFolderById(folder.folders, folderId);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+    
+    // Fonction pour trouver et supprimer un fichier
+    function findAndRemoveFile(node, filePath) {
+      // Chercher dans les fichiers de la racine du classeur
+      if (Array.isArray(node.files)) {
+        const index = node.files.findIndex(f => f.sys_path === filePath);
+        if (index !== -1) {
+          return node.files.splice(index, 1)[0];
+        }
+      }
+      
+      // Chercher dans les dossiers
+      if (node.folders) {
+        for (const [folderId, folder] of Object.entries(node.folders)) {
+          // Chercher dans les fichiers du dossier
+          if (folder.files) {
+            for (const [fileId, file] of Object.entries(folder.files)) {
+              if (file.sys_path === filePath) {
+                const removed = folder.files[fileId];
+                delete folder.files[fileId];
+                return removed;
+              }
+            }
+          }
+          
+          // Chercher récursivement dans les sous-dossiers
+          const found = findAndRemoveFile(folder, filePath);
+          if (found) return found;
+        }
+      }
+      
+      return null;
+    }
+    
+    // Trouver et retirer le fichier de son emplacement actuel
+    const fileToMove = findAndRemoveFile(cls, filePath);
+    if (!fileToMove) throw new Error('Fichier introuvable');
+    
+    // Déterminer la destination
+    const targetFolder = targetFolderId ? findFolderById(cls.folders, targetFolderId) : null;
+    const destDir = targetFolder ? targetFolder.sys_path : cls.sys_path;
+    
+    // Déplacer physiquement le fichier
+    const fileName = path.basename(filePath);
+    const newPath = path.join(destDir, fileName);
+    
+    await fsp.mkdir(destDir, { recursive: true });
+    await fsp.rename(filePath, newPath);
+    
+    // Mettre à jour le chemin dans l'objet fichier
+    fileToMove.sys_path = newPath;
+    
+    // Ajouter le fichier à la destination
+    if (targetFolder) {
+      targetFolder.files = targetFolder.files || {};
+      const fid = `file_${(db.nextId.fichiers = (db.nextId.fichiers || 1) + 1)}`;
+      targetFolder.files[fid] = fileToMove;
+    } else {
+      cls.files = cls.files || [];
+      cls.files.push(fileToMove);
+    }
+    
+    cls.updatedAt = Date.now();
+    await writeDb(db);
+    
+    return { success: true, newPath };
   });
 
   ipcMain.handle('classeur:updateFolder', async (_e, idKey, folderId, updates) => {
@@ -1138,7 +1263,12 @@ function registerIpcHandlers() {
     }
 
     // Marquer le dossier pour la corbeille
-    const folderCopy = JSON.parse(JSON.stringify(folder));
+    let folderCopy;
+    try {
+      folderCopy = JSON.parse(JSON.stringify(folder));
+    } catch (error) {
+      throw new Error(`Erreur lors de la copie du dossier: ${error.message}`);
+    }
     folderCopy.oldSysPath = folder.sys_path;
     folderCopy.sys_path = folderTrashPath;
     folderCopy.oldAppPath = folder.app_path;
@@ -1159,7 +1289,13 @@ function registerIpcHandlers() {
 
     // Ajouter chaque classeur individuellement à la corbeille
     for (const classeur of classeursInFolder) {
-      const copy = JSON.parse(JSON.stringify(classeur));
+      let copy;
+      try {
+        copy = JSON.parse(JSON.stringify(classeur));
+      } catch (error) {
+        console.error(`Erreur lors de la copie du classeur ${classeur.name}:`, error);
+        continue; // Passer au suivant
+      }
       const oldPath = classeur.sys_path;
       const newPath = path.join(folderTrashPath, classeur.name);
       
@@ -1324,7 +1460,13 @@ function registerIpcHandlers() {
       }
     }
 
-    const copy = JSON.parse(JSON.stringify(current));
+    let copy;
+    try {
+      copy = JSON.parse(JSON.stringify(current));
+    } catch (error) {
+      throw new Error(`Erreur lors de la copie du classeur: ${error.message}`);
+    }
+    
     markOldPaths(copy, sourcePath, targetPath);
     copy.deletedAt = Date.now();
     copy.deletedFrom = context; // 'mes' | 'archives'
@@ -1983,6 +2125,10 @@ ipcMain.handle('file:toDataUrl', async (_e, filePath) => {
       mimeType = 'application/vnd.oasis.opendocument.spreadsheet';
     } else if (['.odp'].includes(ext)) {
       mimeType = 'application/vnd.oasis.opendocument.presentation';
+    } else if (['.mp4', '.webm', '.ogg'].includes(ext)) {
+      if (ext === '.mp4') mimeType = 'video/mp4';
+      else if (ext === '.webm') mimeType = 'video/webm';
+      else if (ext === '.ogg') mimeType = 'video/ogg';
     }
     
     const base64 = data.toString('base64');

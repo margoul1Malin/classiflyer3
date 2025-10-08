@@ -784,6 +784,7 @@ async function openClasseurView(id, origin = 'mes-classeurs') {
   setupViewerNav();
   setupClasseurActions();
   setupSidebarResize();
+  setupClasseurSearch(data);
 }
 
 function updateBackButton() {
@@ -850,6 +851,36 @@ function renderClasseurTree(classeur) {
   const rootLabel = document.createElement('div');
   rootLabel.className = 'node is-selected';
   rootLabel.textContent = classeur.name || 'Classeur';
+  
+  // Rendre la racine droppable pour déplacer des fichiers à la racine
+  rootLabel.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    rootLabel.style.backgroundColor = '#e0f2fe';
+  });
+  
+  rootLabel.addEventListener('dragleave', (e) => {
+    e.stopPropagation();
+    rootLabel.style.backgroundColor = '';
+  });
+  
+  rootLabel.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    rootLabel.style.backgroundColor = '';
+    
+    const filePath = e.dataTransfer.getData('text/plain');
+    if (filePath && currentClasseurId) {
+      try {
+        await window.classiflyer.moveFile(currentClasseurId, filePath, null);
+        await refreshClasseurView();
+      } catch (err) {
+        console.error('Erreur lors du déplacement du fichier:', err);
+        alert('Erreur: ' + (err?.message || 'Impossible de déplacer le fichier'));
+      }
+    }
+  });
+  
   tree.appendChild(rootLabel);
 
   // Fonction récursive pour rendre un dossier et ses sous-dossiers
@@ -860,6 +891,7 @@ function renderClasseurTree(classeur) {
              const folderNode = document.createElement('div');
              folderNode.className = 'node folder-node';
              folderNode.style.paddingLeft = `${20 + (depth * 20)}px`;
+             folderNode.dataset.folderId = folderId;
              folderNode.innerHTML = `
                <span>📁 ${folder.name}</span>
                <div class="folder-actions">
@@ -880,15 +912,47 @@ function renderClasseurTree(classeur) {
       }
     });
     
+    // Rendre le dossier droppable pour les fichiers
+    folderNode.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      folderNode.style.backgroundColor = '#e0f2fe';
+    });
+    
+    folderNode.addEventListener('dragleave', (e) => {
+      e.stopPropagation();
+      folderNode.style.backgroundColor = '';
+    });
+    
+    folderNode.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      folderNode.style.backgroundColor = '';
+      
+      const filePath = e.dataTransfer.getData('text/plain');
+      if (filePath && currentClasseurId) {
+        try {
+          await window.classiflyer.moveFile(currentClasseurId, filePath, folderId);
+          await refreshClasseurView();
+        } catch (err) {
+          console.error('Erreur lors du déplacement du fichier:', err);
+          alert('Erreur: ' + (err?.message || 'Impossible de déplacer le fichier'));
+        }
+      }
+    });
+    
     folderContainer.appendChild(folderNode);
 
     // Ajouter les fichiers de ce dossier
     if (folder.files) {
       for (const [fileId, f] of Object.entries(folder.files)) {
         const fnode = document.createElement('div');
-        fnode.className = 'node';
+        fnode.className = 'node file-node';
         fnode.style.paddingLeft = `${20 + ((depth + 1) * 20)}px`;
         fnode.textContent = `📄 ${f.name}`;
+        fnode.draggable = true;
+        fnode.dataset.filePath = f.sys_path;
+        
         fnode.addEventListener('click', async () => {
           const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
           if (idx >= 0) {
@@ -897,6 +961,18 @@ function renderClasseurTree(classeur) {
             highlightSelected(tree, f.sys_path);
           }
         });
+        
+        // Drag start
+        fnode.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', f.sys_path);
+          fnode.style.opacity = '0.4';
+        });
+        
+        fnode.addEventListener('dragend', (e) => {
+          fnode.style.opacity = '1';
+        });
+        
         folderContainer.appendChild(fnode);
       }
     }
@@ -916,9 +992,12 @@ function renderClasseurTree(classeur) {
   if (Array.isArray(classeur.files)) {
     for (const f of classeur.files) {
       const fnode = document.createElement('div');
-      fnode.className = 'node';
+      fnode.className = 'node file-node';
       fnode.style.paddingLeft = '22px';
       fnode.textContent = `📄 ${f.name}`;
+      fnode.draggable = true;
+      fnode.dataset.filePath = f.sys_path;
+      
       fnode.addEventListener('click', async () => {
         const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
         if (idx >= 0) {
@@ -927,6 +1006,18 @@ function renderClasseurTree(classeur) {
           highlightSelected(tree, f.sys_path);
         }
       });
+      
+      // Drag start
+      fnode.addEventListener('dragstart', (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', f.sys_path);
+        fnode.style.opacity = '0.4';
+      });
+      
+      fnode.addEventListener('dragend', (e) => {
+        fnode.style.opacity = '1';
+      });
+      
       tree.appendChild(fnode);
     }
   }
@@ -945,6 +1036,174 @@ function highlightSelected(tree, sysPath) {
   nodes.forEach((n) => n.classList.remove('is-selected'));
   const match = Array.from(nodes).find((n) => n.textContent && n.textContent.includes(sysPath));
   if (match) match.classList.add('is-selected');
+}
+
+function setupClasseurSearch(classeur) {
+  const searchInput = document.getElementById('classeur-search');
+  if (!(searchInput instanceof HTMLInputElement)) return;
+  
+  // Réinitialiser la valeur de recherche
+  searchInput.value = '';
+  
+  // Fonction pour filtrer et afficher l'arbre
+  const filterTree = () => {
+    const searchTerm = searchInput.value.trim().toLowerCase();
+    
+    if (searchTerm === '') {
+      // Si la recherche est vide, afficher l'arbre complet
+      renderClasseurTree(classeur);
+    } else {
+      // Filtrer et afficher les résultats
+      renderFilteredClasseurTree(classeur, searchTerm);
+    }
+  };
+  
+  // Ajouter l'événement input pour la recherche en temps réel
+  searchInput.addEventListener('input', filterTree);
+}
+
+function renderFilteredClasseurTree(classeur, searchTerm) {
+  const tree = document.getElementById('classeur-tree');
+  if (!tree) return;
+  tree.innerHTML = '';
+
+  const rootLabel = document.createElement('div');
+  rootLabel.className = 'node';
+  rootLabel.textContent = classeur.name || 'Classeur';
+  tree.appendChild(rootLabel);
+
+  let hasResults = false;
+
+  // Fonction pour vérifier si un élément correspond à la recherche
+  const matchesSearch = (name) => {
+    return name.toLowerCase().includes(searchTerm);
+  };
+
+  // Fonction récursive pour chercher dans un dossier
+  function searchInFolder(folder, folderId, depth = 1) {
+    let folderHasMatches = false;
+    const folderMatches = matchesSearch(folder.name);
+    const results = [];
+
+    // Chercher dans les fichiers de ce dossier
+    if (folder.files) {
+      for (const [fileId, f] of Object.entries(folder.files)) {
+        if (matchesSearch(f.name)) {
+          const fnode = document.createElement('div');
+          fnode.className = 'node file-node';
+          fnode.style.paddingLeft = `${20 + (depth * 20)}px`;
+          fnode.textContent = `📄 ${f.name}`;
+          fnode.draggable = true;
+          fnode.dataset.filePath = f.sys_path;
+          
+          fnode.addEventListener('click', async () => {
+            const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
+            if (idx >= 0) {
+              currentFileIndex = idx;
+              await renderViewer(currentFileList[currentFileIndex]);
+              highlightSelected(tree, f.sys_path);
+            }
+          });
+          
+          // Drag start
+          fnode.addEventListener('dragstart', (e) => {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', f.sys_path);
+            fnode.style.opacity = '0.4';
+          });
+          
+          fnode.addEventListener('dragend', (e) => {
+            fnode.style.opacity = '1';
+          });
+          
+          results.push(fnode);
+          folderHasMatches = true;
+          hasResults = true;
+        }
+      }
+    }
+
+    // Chercher récursivement dans les sous-dossiers
+    if (folder.folders) {
+      for (const [subFolderId, subFolder] of Object.entries(folder.folders)) {
+        const subResults = searchInFolder(subFolder, subFolderId, depth + 1);
+        if (subResults.length > 0) {
+          results.push(...subResults);
+          folderHasMatches = true;
+          hasResults = true;
+        }
+      }
+    }
+
+    // Si le dossier ou son contenu correspond, l'afficher
+    if (folderMatches || folderHasMatches) {
+      const folderNode = document.createElement('div');
+      folderNode.className = 'node folder-node';
+      folderNode.style.paddingLeft = `${20 + (depth * 20)}px`;
+      folderNode.textContent = `📁 ${folder.name}`;
+      
+      const container = [folderNode, ...results];
+      return container;
+    }
+
+    return results;
+  }
+
+  // Chercher dans les fichiers racine
+  if (Array.isArray(classeur.files)) {
+    for (const f of classeur.files) {
+      if (matchesSearch(f.name)) {
+        const fnode = document.createElement('div');
+        fnode.className = 'node file-node';
+        fnode.style.paddingLeft = '22px';
+        fnode.textContent = `📄 ${f.name}`;
+        fnode.draggable = true;
+        fnode.dataset.filePath = f.sys_path;
+        
+        fnode.addEventListener('click', async () => {
+          const idx = currentFileList.findIndex((x) => x.sys_path === f.sys_path);
+          if (idx >= 0) {
+            currentFileIndex = idx;
+            await renderViewer(currentFileList[currentFileIndex]);
+            highlightSelected(tree, f.sys_path);
+          }
+        });
+        
+        // Drag start
+        fnode.addEventListener('dragstart', (e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', f.sys_path);
+          fnode.style.opacity = '0.4';
+        });
+        
+        fnode.addEventListener('dragend', (e) => {
+          fnode.style.opacity = '1';
+        });
+        
+        tree.appendChild(fnode);
+        hasResults = true;
+      }
+    }
+  }
+
+  // Chercher dans tous les dossiers
+  if (classeur.folders) {
+    for (const [folderId, folder] of Object.entries(classeur.folders)) {
+      const results = searchInFolder(folder, folderId);
+      results.forEach(node => tree.appendChild(node));
+    }
+  }
+
+  // Afficher un message si aucun résultat
+  if (!hasResults) {
+    const noResults = document.createElement('div');
+    noResults.className = 'node';
+    noResults.style.paddingLeft = '22px';
+    noResults.style.color = '#64748b';
+    noResults.style.fontStyle = 'italic';
+    noResults.textContent = 'Aucun résultat trouvé';
+    tree.appendChild(noResults);
+  }
 }
 
 function setupViewerNav() {
@@ -1161,11 +1420,14 @@ async function renderViewer(file) {
   const isOdtByExt = /\.odt$/.test(lowerPath);
   const isOdsByExt = /\.ods$/.test(lowerPath);
   const isOdpByExt = /\.odp$/.test(lowerPath);
+  const isVideoByExt = /\.(mp4|webm|ogg)$/.test(lowerPath);
   
   if (mime.startsWith('image/') || isImageByExt) {
     await renderImage(filePath, canvas);
   } else if (mime === 'application/pdf' || isPdfByExt) {
     await renderPDF(filePath, canvas, pdfNav);
+  } else if (mime.startsWith('video/') || isVideoByExt) {
+    await renderVideo(filePath, canvas);
   } else if (mime.includes('excel') || isExcelByExt || mime.includes('spreadsheet')) {
     await renderExcel(filePath, canvas);
   } else if (mime === 'text/plain' || isTxtByExt) {
@@ -1315,6 +1577,39 @@ async function renderImage(filePath, canvas) {
     console.error('Erreur lors du chargement de l\'image:', error);
     const hint = document.createElement('div');
     hint.textContent = 'Erreur lors du chargement de l\'image.';
+    canvas.appendChild(hint);
+  }
+}
+
+async function renderVideo(filePath, canvas) {
+  try {
+    // Charger la vidéo en data URL
+    const dataUrl = await window.classiflyer.fileToDataUrl(filePath);
+    
+    // Créer un élément video
+    const videoElement = document.createElement('video');
+    videoElement.src = dataUrl;
+    videoElement.controls = true;
+    videoElement.style.maxWidth = '100%';
+    videoElement.style.maxHeight = '100%';
+    videoElement.style.width = 'auto';
+    videoElement.style.height = 'auto';
+    videoElement.style.display = 'block';
+    videoElement.style.margin = '0 auto';
+    videoElement.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+    videoElement.style.borderRadius = '4px';
+    
+    canvas.appendChild(videoElement);
+    
+    // Mettre en surbrillance le fichier actuel dans la sidebar
+    highlightCurrentFile(filePath);
+    
+  } catch (error) {
+    console.error('Erreur lors du chargement de la vidéo:', error);
+    const hint = document.createElement('div');
+    hint.style.textAlign = 'center';
+    hint.style.padding = '20px';
+    hint.textContent = 'Erreur lors du chargement de la vidéo.';
     canvas.appendChild(hint);
   }
 }
@@ -2537,13 +2832,21 @@ async function renderPDF(filePath, canvas, pdfNav) {
     canvas.innerHTML = '';
     pdfNav.style.display = 'flex';
 
+    // Créer un wrapper pour le canvas PDF (pour gérer le drag)
+    const pdfWrapper = document.createElement('div');
+    pdfWrapper.style.cssText = `
+      display: inline-block;
+      transition: transform 0.2s ease;
+      cursor: grab;
+    `;
+
     // Créer un canvas pour le rendu
     const pdfCanvas = document.createElement('canvas');
     pdfCanvas.style.display = 'block';
-    pdfCanvas.style.margin = '0 auto';
     pdfCanvas.style.border = '1px solid #ddd';
-    pdfCanvas.style.cursor = 'grab';
-    canvas.appendChild(pdfCanvas);
+    pdfCanvas.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+    pdfWrapper.appendChild(pdfCanvas);
+    canvas.appendChild(pdfWrapper);
 
     // Charger le document avec PDF.js
     const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
@@ -2559,12 +2862,22 @@ async function renderPDF(filePath, canvas, pdfNav) {
     zoomControls.style.display = 'flex';
     
     let currentZoom = 1.5; // Zoom initial du PDF
+    let translateX = 0;
+    let translateY = 0;
+    let isDragging = false;
+    let startX, startY;
+    
+    // Fonction pour mettre à jour la transformation
+    const updateTransform = () => {
+      pdfWrapper.style.transform = `translate(${translateX}px, ${translateY}px) scale(1)`;
+      document.getElementById('zoom-level').textContent = `${Math.round((currentZoom / 1.5) * 100)}%`;
+    };
     
     // Fonction pour mettre à jour le zoom PDF
     const updatePdfZoom = async (zoom) => {
       currentZoom = zoom;
-      document.getElementById('zoom-level').textContent = `${Math.round((zoom / 1.5) * 100)}%`;
       await renderCurrentPdfPage(pdfCanvas, zoom);
+      updateTransform();
     };
     
     // Boutons de zoom PDF
@@ -2577,8 +2890,36 @@ async function renderPDF(filePath, canvas, pdfNav) {
     };
     
     document.getElementById('zoom-reset').onclick = async () => {
+      currentZoom = 1.5;
+      translateX = 0;
+      translateY = 0;
       await updatePdfZoom(1.5);
     };
+    
+    // Gestion du drag pour déplacer le PDF
+    pdfWrapper.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startX = e.clientX - translateX;
+      startY = e.clientY - translateY;
+      pdfWrapper.style.cursor = 'grabbing';
+      pdfWrapper.style.transition = 'none';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        translateX = e.clientX - startX;
+        translateY = e.clientY - startY;
+        updateTransform();
+      }
+    });
+    
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        pdfWrapper.style.cursor = 'grab';
+        pdfWrapper.style.transition = 'transform 0.2s ease';
+      }
+    });
     
     // Initialiser l'affichage du zoom PDF (et rendre la première page)
     await updatePdfZoom(currentZoom);
